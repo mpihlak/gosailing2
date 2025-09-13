@@ -18,14 +18,16 @@ func (sp *SimplePolar) GetBoatSpeed(twa, tws float64) float64 {
 		absTWA = 360 - absTWA
 	}
 
-	// Simple polar curve - boat can't sail closer than 45 degrees to wind
-	if absTWA < 45 {
+	// Simple polar curve - boat can make some progress down to 30 degrees
+	if absTWA < 30 {
 		return 0 // In irons - can't sail this close to wind
 	}
 
 	// Basic speed calculation based on wind angle
 	var speedFactor float64
 	switch {
+	case absTWA < 45: // Very close hauled (30-45 degrees)
+		speedFactor = 0.2 // Very slow progress
 	case absTWA < 60: // Close hauled
 		speedFactor = 0.6
 	case absTWA < 90: // Close reach
