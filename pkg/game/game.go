@@ -9,6 +9,7 @@ import (
 	"github.com/mpihlak/ebiten-sailing/pkg/game/objects"
 	"github.com/mpihlak/ebiten-sailing/pkg/game/world"
 	"github.com/mpihlak/ebiten-sailing/pkg/geometry"
+	"github.com/mpihlak/ebiten-sailing/pkg/polars"
 )
 
 const (
@@ -24,10 +25,17 @@ type GameState struct {
 }
 
 func NewGame() *GameState {
+	wind := &world.ConstantWind{
+		Direction: 0, // From North
+		Speed:     10,
+	}
+
 	boat := &objects.Boat{
 		Pos:     geometry.Point{X: ScreenWidth / 2, Y: ScreenHeight - 100},
 		Heading: 90,
 		Speed:   1, // Initial speed
+		Polars:  &polars.SimplePolar{},
+		Wind:    wind,
 	}
 	arena := &world.Arena{
 		Marks: []*world.Mark{
@@ -35,10 +43,6 @@ func NewGame() *GameState {
 			{Pos: geometry.Point{X: 100, Y: ScreenHeight - 200}, Name: "Pin"},
 			{Pos: geometry.Point{X: ScreenWidth - 100, Y: ScreenHeight - 200}, Name: "Committee"},
 		},
-	}
-	wind := &world.ConstantWind{
-		Direction: 0, // From North
-		Speed:     10,
 	}
 	dash := &dashboard.Dashboard{
 		Boat:      boat,

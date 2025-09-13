@@ -7,14 +7,17 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/mpihlak/ebiten-sailing/pkg/game/world"
 	"github.com/mpihlak/ebiten-sailing/pkg/geometry"
+	"github.com/mpihlak/ebiten-sailing/pkg/polars"
 )
 
 const (
 	maxHistoryPoints = 50
 	historyInterval  = 200 * time.Millisecond
-	boatHeight       = 15.0 // Triangle height
-	boatWidth        = 7.5  // Triangle width
+	boatHeight       = 15.0       // Triangle height
+	boatWidth        = 7.5        // Triangle width
+	speedScale       = 30.0 / 6.0 // Pixels per second per knot (10 pixels/sec at 6 knots)
 )
 
 type Boat struct {
@@ -23,6 +26,8 @@ type Boat struct {
 	Speed       float64        // in knots
 	History     []geometry.Point
 	lastHistory time.Time
+	Polars      polars.Polars // Polar performance data
+	Wind        world.Wind    // Wind interface to get wind conditions
 }
 
 // GetBowPosition returns the position of the boat's bow (front tip)
@@ -37,12 +42,29 @@ func (b *Boat) GetBowPosition() geometry.Point {
 }
 
 func (b *Boat) Update() {
+	// Get wind conditions at boat position
+	windDir, windSpeed := b.Wind.GetWind(b.Pos)
+
+	// Calculate True Wind Angle (TWA)
+	twa := b.Heading - windDir
+	if twa < -180 {
+		twa += 360
+	} else if twa > 180 {
+		twa -= 360
+	}
+
+	// Update boat speed based on polars
+	b.Speed = b.Polars.GetBoatSpeed(twa, windSpeed)
+
 	// Convert heading to radians for math functions
 	headingRad := b.Heading * math.Pi / 180
 
+	// Scale speed from knots to pixels per frame (assuming 60 FPS)
+	pixelSpeed := b.Speed * speedScale / 60.0
+
 	// Move boat
-	b.Pos.X += b.Speed * math.Sin(headingRad)
-	b.Pos.Y -= b.Speed * math.Cos(headingRad) // Y is inverted in screen coordinates
+	b.Pos.X += pixelSpeed * math.Sin(headingRad)
+	b.Pos.Y -= pixelSpeed * math.Cos(headingRad) // Y is inverted in screen coordinates
 
 	// Add to history
 	if time.Since(b.lastHistory) >= historyInterval {
