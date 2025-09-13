@@ -18,12 +18,15 @@ const (
 	boatHeight       = 15.0       // Triangle height
 	boatWidth        = 7.5        // Triangle width
 	speedScale       = 30.0 / 6.0 // Pixels per second per knot (10 pixels/sec at 6 knots)
+	boatMass         = 4000.0     // Boat mass in kg
+	dragCoefficient  = 0.02       // Water resistance coefficient (reduced for more gradual deceleration)
 )
 
 type Boat struct {
 	Pos         geometry.Point // Center of the boat
 	Heading     float64        // in degrees
-	Speed       float64        // in knots
+	Speed       float64        // in knots (current polar speed)
+	VelX, VelY  float64        // Actual velocity in pixels/frame
 	History     []geometry.Point
 	lastHistory time.Time
 	Polars      polars.Polars // Polar performance data
@@ -53,18 +56,58 @@ func (b *Boat) Update() {
 		twa -= 360
 	}
 
-	// Update boat speed based on polars
-	b.Speed = b.Polars.GetBoatSpeed(twa, windSpeed)
+	// Get target speed from polars
+	targetSpeed := b.Polars.GetBoatSpeed(twa, windSpeed)
+	b.Speed = targetSpeed // Keep this for display purposes
 
-	// Convert heading to radians for math functions
+	// Convert target speed to target velocity in heading direction
 	headingRad := b.Heading * math.Pi / 180
+	targetPixelSpeed := targetSpeed * speedScale / 60.0
+	targetVelX := targetPixelSpeed * math.Sin(headingRad)
+	targetVelY := -targetPixelSpeed * math.Cos(headingRad) // Y inverted
 
-	// Scale speed from knots to pixels per frame (assuming 60 FPS)
-	pixelSpeed := b.Speed * speedScale / 60.0
+	// Calculate current velocity magnitude
+	currentSpeed := math.Sqrt(b.VelX*b.VelX + b.VelY*b.VelY)
 
-	// Move boat
-	b.Pos.X += pixelSpeed * math.Sin(headingRad)
-	b.Pos.Y -= pixelSpeed * math.Cos(headingRad) // Y is inverted in screen coordinates
+	// Project current velocity onto the heading direction to maintain forward momentum
+	if currentSpeed > 0.01 {
+		// Calculate the component of current velocity in the heading direction
+		currentHeadingVelX := math.Sin(headingRad)
+		currentHeadingVelY := -math.Cos(headingRad)
+
+		// Dot product to get the magnitude of velocity in heading direction
+		forwardSpeed := b.VelX*currentHeadingVelX + b.VelY*currentHeadingVelY
+
+		// Keep the forward momentum but gradually align with heading
+		alignmentFactor := 0.05 // How quickly the boat aligns velocity with heading
+		b.VelX = b.VelX*(1-alignmentFactor) + forwardSpeed*currentHeadingVelX*alignmentFactor
+		b.VelY = b.VelY*(1-alignmentFactor) + forwardSpeed*currentHeadingVelY*alignmentFactor
+	}
+
+	// Apply drag force (proportional to velocity squared)
+	currentSpeed = math.Sqrt(b.VelX*b.VelX + b.VelY*b.VelY)
+	dragForce := dragCoefficient * currentSpeed * currentSpeed
+
+	// Calculate drag acceleration (F = ma, so a = F/m)
+	dragAccel := dragForce / boatMass * 20 // Reduced scale factor for gentler deceleration
+
+	// Apply drag in opposite direction of movement
+	if currentSpeed > 0.01 { // Avoid division by zero
+		dragVelX := -dragAccel * (b.VelX / currentSpeed) / 60.0 // Convert to per-frame
+		dragVelY := -dragAccel * (b.VelY / currentSpeed) / 60.0
+		b.VelX += dragVelX
+		b.VelY += dragVelY
+	}
+
+	// Apply force towards target velocity (wind power)
+	// This simulates the boat's ability to accelerate towards the polar speed
+	accelerationFactor := 0.02 // Reduced for more gradual acceleration
+	b.VelX += (targetVelX - b.VelX) * accelerationFactor
+	b.VelY += (targetVelY - b.VelY) * accelerationFactor
+
+	// Move boat using actual velocity
+	b.Pos.X += b.VelX
+	b.Pos.Y += b.VelY
 
 	// Add to history
 	if time.Since(b.lastHistory) >= historyInterval {
