@@ -9,7 +9,7 @@ import (
 
 func main() {
 	ebiten.SetWindowSize(game.ScreenWidth, game.ScreenHeight)
-	ebiten.SetWindowTitle("Ebiten Sailing")
+	ebiten.SetWindowTitle("Go Sailing!")
 
 	g := game.NewGame()
 
