@@ -16,11 +16,22 @@ const (
 )
 
 type Boat struct {
-	Pos         geometry.Point
-	Heading     float64 // in degrees
-	Speed       float64 // in knots
+	Pos         geometry.Point // Center of the boat
+	Heading     float64        // in degrees
+	Speed       float64        // in knots
 	History     []geometry.Point
 	lastHistory time.Time
+}
+
+// GetBowPosition returns the position of the boat's bow (front tip)
+func (b *Boat) GetBowPosition() geometry.Point {
+	headingRad := b.Heading * math.Pi / 180
+	bowDistance := 7.5 // Half the triangle height (15/2)
+
+	return geometry.Point{
+		X: b.Pos.X + bowDistance*math.Sin(headingRad),
+		Y: b.Pos.Y - bowDistance*math.Cos(headingRad),
+	}
 }
 
 func (b *Boat) Update() {
@@ -44,8 +55,14 @@ func (b *Boat) Update() {
 }
 
 func (b *Boat) Draw(screen *ebiten.Image) {
-	// Draw boat history
-	for _, p := range b.History {
+	// Draw boat history (skip the last 2 points to avoid overlap with boat)
+	historyToShow := len(b.History) - 2
+	if historyToShow < 0 {
+		historyToShow = 0
+	}
+
+	for i := 0; i < historyToShow; i++ {
+		p := b.History[i]
 		ebitenutil.DrawCircle(screen, p.X, p.Y, 2, color.RGBA{173, 216, 230, 150})
 	}
 
@@ -53,27 +70,31 @@ func (b *Boat) Draw(screen *ebiten.Image) {
 	headingRad := b.Heading * math.Pi / 180
 
 	// Triangle dimensions
-	height := 10.0
-	width := 5.0
+	height := 15.0 // 1.5x bigger than 10
+	width := 7.5   // 1.5x bigger than 5
 
-	// Calculate triangle vertices relative to boat position
-	// Tip is at boat position, base is behind
-	tipX := b.Pos.X
-	tipY := b.Pos.Y
+	// Calculate triangle vertices relative to boat center position
+	// Bow (tip) is forward from center, stern (base) is behind center
+	bowDistance := height / 2
+	sternDistance := height / 2
 
-	// Base vertices (behind the tip)
-	baseX := b.Pos.X - height*math.Sin(headingRad)
-	baseY := b.Pos.Y + height*math.Cos(headingRad)
+	// Bow position (front tip)
+	bowX := b.Pos.X + bowDistance*math.Sin(headingRad)
+	bowY := b.Pos.Y - bowDistance*math.Cos(headingRad)
 
-	// Left and right base points
-	leftX := baseX - (width/2)*math.Cos(headingRad)
-	leftY := baseY - (width/2)*math.Sin(headingRad)
+	// Stern center position (back center)
+	sternX := b.Pos.X - sternDistance*math.Sin(headingRad)
+	sternY := b.Pos.Y + sternDistance*math.Cos(headingRad)
 
-	rightX := baseX + (width/2)*math.Cos(headingRad)
-	rightY := baseY + (width/2)*math.Sin(headingRad)
+	// Left and right stern points
+	leftX := sternX - (width/2)*math.Cos(headingRad)
+	leftY := sternY - (width/2)*math.Sin(headingRad)
+
+	rightX := sternX + (width/2)*math.Cos(headingRad)
+	rightY := sternY + (width/2)*math.Sin(headingRad)
 
 	// Draw triangle using lines
-	ebitenutil.DrawLine(screen, tipX, tipY, leftX, leftY, color.White)
+	ebitenutil.DrawLine(screen, bowX, bowY, leftX, leftY, color.White)
 	ebitenutil.DrawLine(screen, leftX, leftY, rightX, rightY, color.White)
-	ebitenutil.DrawLine(screen, rightX, rightY, tipX, tipY, color.White)
+	ebitenutil.DrawLine(screen, rightX, rightY, bowX, bowY, color.White)
 }
