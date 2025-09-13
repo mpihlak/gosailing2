@@ -13,6 +13,8 @@ import (
 const (
 	maxHistoryPoints = 50
 	historyInterval  = 200 * time.Millisecond
+	boatHeight       = 15.0 // Triangle height
+	boatWidth        = 7.5  // Triangle width
 )
 
 type Boat struct {
@@ -26,7 +28,7 @@ type Boat struct {
 // GetBowPosition returns the position of the boat's bow (front tip)
 func (b *Boat) GetBowPosition() geometry.Point {
 	headingRad := b.Heading * math.Pi / 180
-	bowDistance := 7.5 // Half the triangle height (15/2)
+	bowDistance := boatHeight / 2
 
 	return geometry.Point{
 		X: b.Pos.X + bowDistance*math.Sin(headingRad),
@@ -56,7 +58,7 @@ func (b *Boat) Update() {
 
 func (b *Boat) Draw(screen *ebiten.Image) {
 	// Draw boat history (skip the last 2 points to avoid overlap with boat)
-	historyToShow := len(b.History) - 2
+	historyToShow := len(b.History) - 1
 	if historyToShow < 0 {
 		historyToShow = 0
 	}
@@ -70,8 +72,8 @@ func (b *Boat) Draw(screen *ebiten.Image) {
 	headingRad := b.Heading * math.Pi / 180
 
 	// Triangle dimensions
-	height := 15.0 // 1.5x bigger than 10
-	width := 7.5   // 1.5x bigger than 5
+	height := boatHeight
+	width := boatWidth
 
 	// Calculate triangle vertices relative to boat center position
 	// Bow (tip) is forward from center, stern (base) is behind center
