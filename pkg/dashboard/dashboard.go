@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"fmt"
+	"image/color"
 	"math"
 	"time"
 
@@ -96,7 +97,7 @@ func (d *Dashboard) FindBestVMG() float64 {
 	return bestVMG
 }
 
-func (d *Dashboard) Draw(screen *ebiten.Image) {
+func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, startTime time.Time) {
 	windDir, windSpeed := d.Wind.GetWind(d.Boat.Pos)
 	twa := d.Boat.Heading - windDir
 	if twa < -180 {
@@ -116,13 +117,38 @@ func (d *Dashboard) Draw(screen *ebiten.Image) {
 
 	ebitenutil.DebugPrintAt(screen, msg, screen.Bounds().Dx()-150, 10)
 
-	// Countdown timer
-	remaining := time.Until(d.StartTime)
-	if remaining < 0 {
-		remaining = 0
+	// Race timer display
+	if !raceStarted {
+		remaining := time.Until(startTime)
+		if remaining < 0 {
+			remaining = 0
+		}
+		minutes := int(remaining.Minutes())
+		seconds := int(remaining.Seconds()) % 60
+		timerMsg := fmt.Sprintf("Start: %02d:%02d", minutes, seconds)
+		ebitenutil.DebugPrintAt(screen, timerMsg, screen.Bounds().Dx()-150, 130)
+	} else {
+		ebitenutil.DebugPrintAt(screen, "RACE STARTED", screen.Bounds().Dx()-150, 130)
 	}
-	minutes := int(remaining.Minutes())
-	seconds := int(remaining.Seconds()) % 60
-	timerMsg := fmt.Sprintf("Start: %02d:%02d", minutes, seconds)
-	ebitenutil.DebugPrintAt(screen, timerMsg, screen.Bounds().Dx()-150, 130)
+
+	// OCS warning
+	if isOCS && !raceStarted {
+		// Draw red background rectangle for OCS warning
+		ocsX := screen.Bounds().Dx() - 150
+		ocsY := 150
+		ocsWidth := 80
+		ocsHeight := 15
+		
+		// Create red rectangle
+		redRect := ebiten.NewImage(ocsWidth, ocsHeight)
+		redRect.Fill(color.RGBA{255, 0, 0, 255}) // Red background
+		
+		// Draw red rectangle
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Translate(float64(ocsX), float64(ocsY))
+		screen.DrawImage(redRect, op)
+		
+		// Draw white text on red background
+		ebitenutil.DebugPrintAt(screen, "*** OCS ***", ocsX, ocsY)
+	}
 }

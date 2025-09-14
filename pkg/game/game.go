@@ -27,15 +27,20 @@ const (
 )
 
 type GameState struct {
-	Boat      *objects.Boat
-	Arena     *world.Arena
-	Wind      world.Wind
-	Dashboard *dashboard.Dashboard
-	CameraX   float64 // Camera offset for panning
-	CameraY   float64
-	lastInput time.Time // Last time input was processed
-	isPaused  bool      // Game pause state
+	Boat           *objects.Boat
+	Arena          *world.Arena
+	Wind           world.Wind
+	Dashboard      *dashboard.Dashboard
+	CameraX        float64 // Camera offset for panning
+	CameraY        float64
+	lastInput      time.Time // Last time input was processed
+	isPaused       bool      // Game pause state
 	lastPauseInput time.Time // Last time pause key was pressed
+	// Race start timer
+	startTime     time.Time // Time when race starts (2 minutes from game start)
+	raceStarted   bool      // Whether the race has started
+	// OCS detection
+	isOCS         bool      // Whether boat is On Course Side
 }
 
 func NewGame() *GameState {
@@ -97,13 +102,16 @@ func NewGame() *GameState {
 	cameraY := lineY - float64(ScreenHeight)/2 + 100        // Show line and area below
 
 	return &GameState{
-		Boat:      boat,
-		Arena:     arena,
-		Wind:      wind,
-		Dashboard: dash,
-		CameraX:   cameraX,
-		CameraY:   cameraY,
-		isPaused:  true, // Start game in paused mode
+		Boat:        boat,
+		Arena:       arena,
+		Wind:        wind,
+		Dashboard:   dash,
+		CameraX:     cameraX,
+		CameraY:     cameraY,
+		isPaused:    true, // Start game in paused mode
+		startTime:   time.Now().Add(1 * time.Minute), // Race starts in 1 minute
+		raceStarted: false,
+		isOCS:       false,
 	}
 }
 
@@ -112,17 +120,35 @@ func (g *GameState) Update() error {
 	if ebiten.IsKeyPressed(ebiten.KeyQ) {
 		os.Exit(0)
 	}
-	
+
 	// Handle pause toggle
 	if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
 		g.isPaused = !g.isPaused
 	}
-	
+
 	// Don't update game logic when paused
 	if g.isPaused {
 		return nil
 	}
-	
+
+	// Check race start timer
+	if !g.raceStarted && time.Now().After(g.startTime) {
+		g.raceStarted = true
+	}
+
+	// OCS detection - check if boat is above (course side of) the starting line
+	// Starting line is at Y = 600, boat is OCS if Y < 600
+	startLineY := 600.0
+	if !g.raceStarted {
+		// Before race start, check if boat crosses to course side
+		if g.Boat.Pos.Y < startLineY {
+			g.isOCS = true
+		} else if g.isOCS && g.Boat.Pos.Y > startLineY {
+			// Clear OCS only when boat dips below the line
+			g.isOCS = false
+		}
+	}
+
 	// Input handling with delay to prevent overturning
 	if time.Since(g.lastInput) >= inputDelay {
 		if ebiten.IsKeyPressed(ebiten.KeyLeft) || ebiten.IsKeyPressed(ebiten.KeyA) {
@@ -190,7 +216,7 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	worldImage.Fill(color.RGBA{0, 105, 148, 255}) // Blue for water
 
 	// Draw arena (which includes marks) to world
-	g.Arena.Draw(worldImage)
+	g.Arena.Draw(worldImage, g.raceStarted)
 
 	// Draw boat (which includes its history trail) to world
 	g.Boat.Draw(worldImage)
@@ -199,8 +225,13 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	screen.DrawImage(worldImage, op)
 
 	// Draw dashboard directly to screen (UI always visible)
-	g.Dashboard.Draw(screen)
-	
+	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.startTime)
+
+	// Show START banner when race just started
+	if g.raceStarted && time.Since(g.startTime) < 3*time.Second {
+		g.drawStartBanner(screen)
+	}
+
 	// Draw help screen when paused
 	if g.isPaused {
 		g.drawHelpScreen(screen)
@@ -213,7 +244,7 @@ func (g *GameState) drawHelpScreen(screen *ebiten.Image) {
 	overlay := ebiten.NewImage(ScreenWidth, ScreenHeight)
 	overlay.Fill(color.RGBA{0, 0, 0, 180})
 	screen.DrawImage(overlay, nil)
-	
+
 	// Help text
 	helpText := `SAILING GAME - PAUSED
 
@@ -237,8 +268,27 @@ Press SPACE to continue...`
 	bounds := screen.Bounds()
 	x := bounds.Dx()/2 - 200
 	y := bounds.Dy()/2 - 150
-	
+
 	ebitenutil.DebugPrintAt(screen, helpText, x, y)
+}
+
+// drawStartBanner displays the START banner when race begins
+func (g *GameState) drawStartBanner(screen *ebiten.Image) {
+	bounds := screen.Bounds()
+	
+	// Semi-transparent overlay
+	overlay := ebiten.NewImage(ScreenWidth, ScreenHeight)
+	overlay.Fill(color.RGBA{0, 0, 0, 100})
+	screen.DrawImage(overlay, nil)
+
+	// START banner text
+	startText := "*** RACE START! ***"
+	
+	// Center the text
+	x := bounds.Dx()/2 - 80 // Approximate centering
+	y := bounds.Dy()/2 - 20
+
+	ebitenutil.DebugPrintAt(screen, startText, x, y)
 }
 
 func (g *GameState) Layout(outsideWidth, outsideHeight int) (int, int) {
