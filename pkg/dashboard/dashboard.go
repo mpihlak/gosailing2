@@ -124,7 +124,12 @@ func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, tim
 			remaining = 0
 		}
 		minutes := int(remaining.Minutes())
-		seconds := int(remaining.Seconds()) % 60
+		// Use ceiling for seconds to avoid showing 0 when there's still time left
+		seconds := int(math.Ceil(remaining.Seconds())) % 60
+		// Special case: if we're showing 0 minutes and 0 seconds but there's still time, show 1 second
+		if minutes == 0 && seconds == 0 && remaining > 0 {
+			seconds = 1
+		}
 		timerMsg := fmt.Sprintf("Start: %02d:%02d", minutes, seconds)
 		ebitenutil.DebugPrintAt(screen, timerMsg, screen.Bounds().Dx()-150, 130)
 	} else {
