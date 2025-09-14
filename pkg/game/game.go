@@ -3,9 +3,12 @@ package game
 import (
 	"image/color"
 	"math"
+	"os"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/mpihlak/ebiten-sailing/pkg/dashboard"
 	"github.com/mpihlak/ebiten-sailing/pkg/game/objects"
 	"github.com/mpihlak/ebiten-sailing/pkg/game/world"
@@ -31,6 +34,8 @@ type GameState struct {
 	CameraX   float64 // Camera offset for panning
 	CameraY   float64
 	lastInput time.Time // Last time input was processed
+	isPaused  bool      // Game pause state
+	lastPauseInput time.Time // Last time pause key was pressed
 }
 
 func NewGame() *GameState {
@@ -98,10 +103,26 @@ func NewGame() *GameState {
 		Dashboard: dash,
 		CameraX:   cameraX,
 		CameraY:   cameraY,
+		isPaused:  true, // Start game in paused mode
 	}
 }
 
 func (g *GameState) Update() error {
+	// Handle quit key
+	if ebiten.IsKeyPressed(ebiten.KeyQ) {
+		os.Exit(0)
+	}
+	
+	// Handle pause toggle
+	if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
+		g.isPaused = !g.isPaused
+	}
+	
+	// Don't update game logic when paused
+	if g.isPaused {
+		return nil
+	}
+	
 	// Input handling with delay to prevent overturning
 	if time.Since(g.lastInput) >= inputDelay {
 		if ebiten.IsKeyPressed(ebiten.KeyLeft) || ebiten.IsKeyPressed(ebiten.KeyA) {
@@ -179,6 +200,45 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 
 	// Draw dashboard directly to screen (UI always visible)
 	g.Dashboard.Draw(screen)
+	
+	// Draw help screen when paused
+	if g.isPaused {
+		g.drawHelpScreen(screen)
+	}
+}
+
+// drawHelpScreen displays the help overlay when game is paused
+func (g *GameState) drawHelpScreen(screen *ebiten.Image) {
+	// Semi-transparent overlay
+	overlay := ebiten.NewImage(ScreenWidth, ScreenHeight)
+	overlay.Fill(color.RGBA{0, 0, 0, 180})
+	screen.DrawImage(overlay, nil)
+	
+	// Help text
+	helpText := `SAILING GAME - PAUSED
+
+Controls:
+  Left Arrow / A  - Turn Left
+  Right Arrow / D - Turn Right
+  Space           - Pause/Resume
+  Q               - Quit Game
+
+Dashboard:
+  Speed     - Current boat speed
+  Heading   - Boat direction (0-360°)
+  TWA       - True Wind Angle
+  TWS       - True Wind Speed
+  VMG       - Velocity Made Good
+  Target VMG - Best achievable VMG
+
+Press SPACE to continue...`
+
+	// Center the help text
+	bounds := screen.Bounds()
+	x := bounds.Dx()/2 - 200
+	y := bounds.Dy()/2 - 150
+	
+	ebitenutil.DebugPrintAt(screen, helpText, x, y)
 }
 
 func (g *GameState) Layout(outsideWidth, outsideHeight int) (int, int) {
