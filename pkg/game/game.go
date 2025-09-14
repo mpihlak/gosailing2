@@ -1,9 +1,9 @@
 package game
 
 import (
+	"fmt"
 	"image/color"
 	"math"
-	"os"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -131,9 +131,9 @@ func NewGame() *GameState {
 }
 
 func (g *GameState) Update() error {
-	// Handle quit key
+	// Handle quit key - return error to stop game instead of os.Exit() for WASM compatibility
 	if ebiten.IsKeyPressed(ebiten.KeyQ) {
-		os.Exit(0)
+		return fmt.Errorf("game quit by user")
 	}
 
 	// Handle restart key
