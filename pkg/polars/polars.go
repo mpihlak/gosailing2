@@ -22,19 +22,19 @@ func (rp *RealisticPolar) GetBoatSpeed(twa, tws float64) float64 {
 	windSpeeds := []float64{4, 6, 8, 10, 12, 14, 16, 20, 24}
 
 	// Angle data points and corresponding speeds for each wind speed
-	angles := []float64{52, 60, 75, 90, 110, 120, 135, 150}
+	angles := []float64{52, 60, 75, 90, 110, 120, 135, 150, 170, 180}
 
 	// Speed table: [wind_speed_index][angle_index]
 	speedTable := [][]float64{
-		{3.73, 3.94, 4.06, 3.99, 4.02, 3.85, 3.37, 2.78},   // 4 kt wind
-		{5.05, 5.30, 5.45, 5.47, 5.53, 5.34, 4.77, 4.03},   // 6 kt wind
-		{6.01, 6.25, 6.41, 6.55, 6.64, 6.49, 5.96, 5.18},   // 8 kt wind
-		{6.62, 6.79, 6.93, 7.13, 7.23, 7.14, 6.81, 6.16},   // 10 kt wind
-		{6.94, 7.10, 7.24, 7.47, 7.65, 7.58, 7.33, 6.89},   // 12 kt wind
-		{7.08, 7.27, 7.48, 7.67, 8.04, 7.99, 7.76, 7.35},   // 14 kt wind
-		{7.16, 7.35, 7.65, 7.82, 8.39, 8.41, 8.21, 7.76},   // 16 kt wind
-		{7.24, 7.46, 7.84, 8.19, 8.89, 9.34, 9.24, 8.64},   // 20 kt wind
-		{7.26, 7.49, 7.95, 8.44, 9.30, 10.14, 10.85, 9.90}, // 24 kt wind
+		{3.73, 3.94, 4.06, 3.99, 4.02, 3.85, 3.37, 2.78, 2.20, 1.80},   // 4 kt wind
+		{5.05, 5.30, 5.45, 5.47, 5.53, 5.34, 4.77, 4.03, 3.20, 2.60},   // 6 kt wind
+		{6.01, 6.25, 6.41, 6.55, 6.64, 6.49, 5.96, 5.18, 4.10, 3.30},   // 8 kt wind
+		{6.62, 6.79, 6.93, 7.13, 7.23, 7.14, 6.81, 6.16, 4.90, 3.95},   // 10 kt wind
+		{6.94, 7.10, 7.24, 7.47, 7.65, 7.58, 7.33, 6.89, 5.50, 4.40},   // 12 kt wind
+		{7.08, 7.27, 7.48, 7.67, 8.04, 7.99, 7.76, 7.35, 5.90, 4.70},   // 14 kt wind
+		{7.16, 7.35, 7.65, 7.82, 8.39, 8.41, 8.21, 7.76, 6.20, 4.95},   // 16 kt wind
+		{7.24, 7.46, 7.84, 8.19, 8.89, 9.34, 9.24, 8.64, 6.90, 5.50},   // 20 kt wind
+		{7.26, 7.49, 7.95, 8.44, 9.30, 10.14, 10.85, 9.90, 7.90, 6.30}, // 24 kt wind
 	}
 
 	// Handle close-hauled angles (30-52 degrees) using beat VMG
@@ -47,24 +47,30 @@ func (rp *RealisticPolar) GetBoatSpeed(twa, tws float64) float64 {
 		beatAngle := rp.interpolateFloat(tws, windSpeeds, beatAngles, windIndex)
 
 		if absTWA < beatAngle {
-			// Instead of hard cutoff, interpolate from 0 speed at TWA=0 to beat VMG at beat angle
+			// Instead of hard cutoff, interpolate from 0 speed at TWA=0 to beat speed at beat angle
 			// Using quadratic curve for more aggressive tapering near zero
 			vmg := rp.interpolateFloat(tws, windSpeeds, beatVMG, windIndex)
+			// Convert VMG to actual boat speed: Speed = VMG / cos(beat angle)
+			beatAngleRad := beatAngle * math.Pi / 180
+			beatSpeed := vmg / math.Cos(beatAngleRad)
 			// Quadratic interpolation: factor^2 gives more aggressive tapering
 			factor := absTWA / beatAngle
-			return vmg * factor * factor
+			return beatSpeed * factor * factor
 		}
 
 		// Interpolate between beat angle and 52 degree speed
 		vmg := rp.interpolateFloat(tws, windSpeeds, beatVMG, windIndex)
+		// Convert VMG to actual boat speed at beat angle
+		beatAngleRad := beatAngle * math.Pi / 180
+		beatSpeed := vmg / math.Cos(beatAngleRad)
 		speed52 := rp.getSpeedAtAngle(52, tws, windSpeeds, angles, speedTable)
 
 		// Linear interpolation between beat angle and 52 degrees
 		factor := (absTWA - beatAngle) / (52 - beatAngle)
-		return vmg + (speed52-vmg)*factor
+		return beatSpeed + (speed52-beatSpeed)*factor
 	}
 
-	// For angles 52-150, use the speed table
+	// For angles 52-180, use the speed table
 	return rp.getSpeedAtAngle(absTWA, tws, windSpeeds, angles, speedTable)
 }
 
