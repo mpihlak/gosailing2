@@ -62,7 +62,7 @@ func (a *Arena) Draw(screen *ebiten.Image, raceStarted bool) {
 	if len(a.Marks) == 2 {
 		pin := a.Marks[0]
 		committee := a.Marks[1]
-		
+
 		// Choose line color based on race state
 		var lineColor color.Color
 		if raceStarted {
@@ -70,7 +70,7 @@ func (a *Arena) Draw(screen *ebiten.Image, raceStarted bool) {
 		} else {
 			lineColor = color.RGBA{255, 255, 255, 255} // White before start
 		}
-		
+
 		// Draw dotted line
 		a.drawDottedLine(screen, pin.Pos.X, pin.Pos.Y, committee.Pos.X, committee.Pos.Y, lineColor)
 	}

@@ -37,10 +37,13 @@ type GameState struct {
 	isPaused       bool      // Game pause state
 	lastPauseInput time.Time // Last time pause key was pressed
 	// Race start timer
-	startTime     time.Time // Time when race starts (2 minutes from game start)
-	raceStarted   bool      // Whether the race has started
+	startTime   time.Time // Time when race starts (2 minutes from game start)
+	raceStarted bool      // Whether the race has started
 	// OCS detection
-	isOCS         bool      // Whether boat is On Course Side
+	isOCS bool // Whether boat is On Course Side
+	// Restart banner
+	showRestartBanner bool      // Whether to show restart banner
+	restartBannerTime time.Time // When restart banner was triggered
 }
 
 func NewGame() *GameState {
@@ -55,9 +58,9 @@ func NewGame() *GameState {
 	committeeX := float64(WorldWidth/2 + 300) // Committee end (right)
 	lineY := float64(600)
 
-	// Boat starts 180 meters below pin end, sailing parallel to line towards committee boat
-	boatStartX := pinX        // Aligned with pin end
-	boatStartY := lineY + 180 // 180 meters below the line
+	// Boat starts 180 meters below middle of line, sailing parallel to line towards committee boat
+	boatStartX := (pinX + committeeX) / 2 // Middle of the starting line
+	boatStartY := lineY + 180             // 180 meters below the line
 
 	boat := &objects.Boat{
 		Pos:     geometry.Point{X: boatStartX, Y: boatStartY},
@@ -108,7 +111,7 @@ func NewGame() *GameState {
 		Dashboard:   dash,
 		CameraX:     cameraX,
 		CameraY:     cameraY,
-		isPaused:    true, // Start game in paused mode
+		isPaused:    true,                            // Start game in paused mode
 		startTime:   time.Now().Add(1 * time.Minute), // Race starts in 1 minute
 		raceStarted: false,
 		isOCS:       false,
@@ -121,6 +124,17 @@ func (g *GameState) Update() error {
 		os.Exit(0)
 	}
 
+	// Handle restart key
+	if inpututil.IsKeyJustPressed(ebiten.KeyR) {
+		newGame := NewGame()
+		*g = *newGame
+		// Unpause and show restart banner
+		g.isPaused = false
+		g.showRestartBanner = true
+		g.restartBannerTime = time.Now()
+		return nil
+	}
+
 	// Handle pause toggle
 	if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
 		g.isPaused = !g.isPaused
@@ -129,6 +143,11 @@ func (g *GameState) Update() error {
 	// Don't update game logic when paused
 	if g.isPaused {
 		return nil
+	}
+
+	// Hide restart banner after 2 seconds
+	if g.showRestartBanner && time.Since(g.restartBannerTime) > 2*time.Second {
+		g.showRestartBanner = false
 	}
 
 	// Check race start timer
@@ -232,6 +251,11 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 		g.drawStartBanner(screen)
 	}
 
+	// Show RESTART banner when game was restarted
+	if g.showRestartBanner {
+		g.drawRestartBanner(screen)
+	}
+
 	// Draw help screen when paused
 	if g.isPaused {
 		g.drawHelpScreen(screen)
@@ -252,6 +276,7 @@ Controls:
   Left Arrow / A  - Turn Left
   Right Arrow / D - Turn Right
   Space           - Pause/Resume
+  R               - Restart Game
   Q               - Quit Game
 
 Dashboard:
@@ -275,7 +300,7 @@ Press SPACE to continue...`
 // drawStartBanner displays the START banner when race begins
 func (g *GameState) drawStartBanner(screen *ebiten.Image) {
 	bounds := screen.Bounds()
-	
+
 	// Semi-transparent overlay
 	overlay := ebiten.NewImage(ScreenWidth, ScreenHeight)
 	overlay.Fill(color.RGBA{0, 0, 0, 100})
@@ -283,12 +308,31 @@ func (g *GameState) drawStartBanner(screen *ebiten.Image) {
 
 	// START banner text
 	startText := "*** RACE START! ***"
-	
+
 	// Center the text
 	x := bounds.Dx()/2 - 80 // Approximate centering
 	y := bounds.Dy()/2 - 20
 
 	ebitenutil.DebugPrintAt(screen, startText, x, y)
+}
+
+// drawRestartBanner displays the RESTART banner when game is restarted
+func (g *GameState) drawRestartBanner(screen *ebiten.Image) {
+	bounds := screen.Bounds()
+
+	// Semi-transparent overlay
+	overlay := ebiten.NewImage(ScreenWidth, ScreenHeight)
+	overlay.Fill(color.RGBA{0, 0, 0, 100})
+	screen.DrawImage(overlay, nil)
+
+	// RESTART banner text
+	restartText := "*** RESTARTED ***"
+
+	// Center the text
+	x := bounds.Dx()/2 - 80 // Approximate centering
+	y := bounds.Dy()/2 - 20
+
+	ebitenutil.DebugPrintAt(screen, restartText, x, y)
 }
 
 func (g *GameState) Layout(outsideWidth, outsideHeight int) (int, int) {

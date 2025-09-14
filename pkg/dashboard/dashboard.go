@@ -138,16 +138,16 @@ func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, sta
 		ocsY := 150
 		ocsWidth := 80
 		ocsHeight := 15
-		
+
 		// Create red rectangle
 		redRect := ebiten.NewImage(ocsWidth, ocsHeight)
 		redRect.Fill(color.RGBA{255, 0, 0, 255}) // Red background
-		
+
 		// Draw red rectangle
 		op := &ebiten.DrawImageOptions{}
 		op.GeoM.Translate(float64(ocsX), float64(ocsY))
 		screen.DrawImage(redRect, op)
-		
+
 		// Draw white text on red background
 		ebitenutil.DebugPrintAt(screen, "*** OCS ***", ocsX, ocsY)
 	}
