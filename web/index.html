@@ -109,7 +109,7 @@
             Downloading and initializing WebAssembly module
         </div>
     </div>
-    
+
     <div class="controls" style="display: none;" id="controls">
         <h3>🎮 Game Controls</h3>
         <div class="control-grid">
@@ -140,20 +140,20 @@
         <p>There was an error loading the sailing game. Please check the browser console for details.</p>
         <div id="error-details" style="margin-top: 10px; font-family: monospace; font-size: 0.8em;"></div>
     </div>
-    
+
     <script src="wasm_exec.js"></script>
     <script>
         const go = new Go();
-        
+
         // Add some debug logging
         console.log('Starting WASM load...');
-        
+
         WebAssembly.instantiateStreaming(fetch("sailing.wasm"), go.importObject)
             .then((result) => {
                 console.log('WASM loaded successfully');
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('controls').style.display = 'block';
-                
+
                 // Run the game
                 go.run(result.instance);
             })

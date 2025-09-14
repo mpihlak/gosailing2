@@ -131,9 +131,16 @@ func NewGame() *GameState {
 }
 
 func (g *GameState) Update() error {
-	// Handle quit key - return error to stop game instead of os.Exit() for WASM compatibility
+	// Handle quit key - different behavior for WASM vs standalone
 	if ebiten.IsKeyPressed(ebiten.KeyQ) {
-		return fmt.Errorf("game quit by user")
+		if IsWASM() {
+			// In WASM, pause the game and show help screen instead of quitting
+			g.isPaused = true
+			return nil
+		} else {
+			// In standalone, return error to exit the application
+			return fmt.Errorf("game quit by user")
+		}
 	}
 
 	// Handle restart key
@@ -331,8 +338,13 @@ func (g *GameState) drawHelpScreen(screen *ebiten.Image) {
 	overlay.Fill(color.RGBA{0, 0, 0, 180})
 	screen.DrawImage(overlay, nil)
 
-	// Help text
-	helpText := `SAILING GAME - PAUSED
+	// Help text with platform-specific quit behavior
+	quitText := "Quit Game"
+	if IsWASM() {
+		quitText = "Pause Game"
+	}
+	
+	helpText := fmt.Sprintf(`SAILING GAME - PAUSED
 
 Controls:
   Left Arrow / A  - Turn Left
@@ -340,7 +352,7 @@ Controls:
   Space           - Pause/Resume
   J               - Jump Timer +10 sec
   R               - Restart Game
-  Q               - Quit Game
+  Q               - %s
 
 Dashboard:
   Speed     - Current boat speed
@@ -350,7 +362,7 @@ Dashboard:
   VMG       - Velocity Made Good
   Target VMG - Best achievable VMG
 
-Press SPACE to continue...`
+Press SPACE to continue...`, quitText)
 
 	// Center the help text
 	bounds := screen.Bounds()
