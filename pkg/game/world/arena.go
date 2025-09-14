@@ -15,8 +15,22 @@ type Mark struct {
 }
 
 func (m *Mark) Draw(screen *ebiten.Image) {
-	ebitenutil.DrawRect(screen, m.Pos.X-5, m.Pos.Y-5, 10, 10, color.RGBA{255, 0, 0, 255})
-	ebitenutil.DebugPrintAt(screen, m.Name, int(m.Pos.X)+15, int(m.Pos.Y))
+	if m.Name == "Pin" {
+		// Draw a small flag at the pin end
+		// Flag pole (vertical line)
+		ebitenutil.DrawLine(screen, m.Pos.X, m.Pos.Y-10, m.Pos.X, m.Pos.Y+5, color.RGBA{139, 69, 19, 255}) // Brown pole
+		// Flag (small triangle)
+		flagColor := color.RGBA{255, 0, 0, 255} // Red flag
+		// Draw flag as small filled triangle
+		for i := 0; i < 6; i++ {
+			ebitenutil.DrawLine(screen, m.Pos.X, m.Pos.Y-10+float64(i), m.Pos.X+8-float64(i), m.Pos.Y-10+float64(i), flagColor)
+		}
+		// Mark base (small circle)
+		ebitenutil.DrawRect(screen, m.Pos.X-2, m.Pos.Y-2, 4, 4, color.RGBA{255, 0, 0, 255})
+	} else {
+		// Draw regular mark (committee boat)
+		ebitenutil.DrawRect(screen, m.Pos.X-5, m.Pos.Y-5, 10, 10, color.RGBA{255, 0, 0, 255})
+	}
 }
 
 type Arena struct {
