@@ -36,6 +36,8 @@ type GameState struct {
 	lastInput      time.Time // Last time input was processed
 	isPaused       bool      // Game pause state
 	lastPauseInput time.Time // Last time pause key was pressed
+	// Mobile controls
+	mobileControls *MobileControls
 	// Race start timer (elapsed time based for pause support)
 	timerDuration  time.Duration // Total duration for race start (1 minute)
 	elapsedTime    time.Duration // Time elapsed since game start (only when not paused)
@@ -119,6 +121,7 @@ func NewGame() *GameState {
 		Dashboard:         dash,
 		CameraX:           cameraX,
 		CameraY:           cameraY,
+		mobileControls:    NewMobileControls(ScreenWidth, ScreenHeight),
 		isPaused:          true,            // Start game in paused mode
 		timerDuration:     1 * time.Minute, // Race starts after 1 minute
 		elapsedTime:       0,               // No time elapsed yet
@@ -131,6 +134,9 @@ func NewGame() *GameState {
 }
 
 func (g *GameState) Update() error {
+	// Process mobile touch input
+	mobileInput := g.mobileControls.Update()
+
 	// Handle quit key - different behavior for WASM vs standalone
 	if ebiten.IsKeyPressed(ebiten.KeyQ) {
 		if IsWASM() {
@@ -143,8 +149,8 @@ func (g *GameState) Update() error {
 		}
 	}
 
-	// Handle restart key
-	if inpututil.IsKeyJustPressed(ebiten.KeyR) {
+	// Handle restart key (keyboard or mobile)
+	if inpututil.IsKeyJustPressed(ebiten.KeyR) || mobileInput.RestartPressed {
 		newGame := NewGame()
 		*g = *newGame
 		// Unpause and show restart banner
@@ -154,8 +160,8 @@ func (g *GameState) Update() error {
 		return nil
 	}
 
-	// Handle timer jump key
-	if inpututil.IsKeyJustPressed(ebiten.KeyJ) {
+	// Handle timer jump key (keyboard or mobile)
+	if inpututil.IsKeyJustPressed(ebiten.KeyJ) || mobileInput.TimerJumpPressed {
 		// Jump timer forward by 10 seconds
 		g.elapsedTime += 10 * time.Second
 		// If this pushes us past race start, trigger race start
@@ -164,8 +170,8 @@ func (g *GameState) Update() error {
 		}
 	}
 
-	// Handle pause toggle
-	if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
+	// Handle pause toggle (keyboard or mobile)
+	if inpututil.IsKeyJustPressed(ebiten.KeySpace) || mobileInput.PausePressed {
 		g.isPaused = !g.isPaused
 		if !g.isPaused {
 			// Reset last update time when unpausing to avoid large time jump
@@ -239,11 +245,16 @@ func (g *GameState) Update() error {
 
 	// Input handling with delay to prevent overturning
 	if time.Since(g.lastInput) >= inputDelay {
-		if ebiten.IsKeyPressed(ebiten.KeyLeft) || ebiten.IsKeyPressed(ebiten.KeyA) {
+		// Check keyboard input
+		keyboardLeft := ebiten.IsKeyPressed(ebiten.KeyLeft) || ebiten.IsKeyPressed(ebiten.KeyA)
+		keyboardRight := ebiten.IsKeyPressed(ebiten.KeyRight) || ebiten.IsKeyPressed(ebiten.KeyD)
+
+		// Combine keyboard and mobile input
+		if keyboardLeft || mobileInput.TurnLeft {
 			g.Boat.Heading -= 1
 			g.lastInput = time.Now()
 		}
-		if ebiten.IsKeyPressed(ebiten.KeyRight) || ebiten.IsKeyPressed(ebiten.KeyD) {
+		if keyboardRight || mobileInput.TurnRight {
 			g.Boat.Heading += 1
 			g.lastInput = time.Now()
 		}
@@ -315,6 +326,9 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	// Draw dashboard directly to screen (UI always visible)
 	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.timerDuration, g.elapsedTime, g.hasCrossedLine, g.secondsLate, g.speedPercentage)
 
+	// Draw mobile controls (only visible on touch devices)
+	g.mobileControls.Draw(screen)
+
 	// Show START banner when race just started (for 3 seconds after race start)
 	if g.raceStarted && g.elapsedTime-g.timerDuration < 3*time.Second {
 		g.drawStartBanner(screen)
@@ -343,7 +357,7 @@ func (g *GameState) drawHelpScreen(screen *ebiten.Image) {
 	if IsWASM() {
 		quitText = "Pause Game"
 	}
-	
+
 	helpText := fmt.Sprintf(`SAILING GAME - PAUSED
 
 Controls:
