@@ -31,7 +31,7 @@ func NewGame() *GameState {
 	}
 
 	boat := &objects.Boat{
-		Pos:     geometry.Point{X: ScreenWidth / 2, Y: ScreenHeight - 100},
+		Pos:     geometry.Point{X: ScreenWidth / 2, Y: ScreenHeight - 150}, // Positioned behind starting line
 		Heading: 90,
 		Speed:   1, // Initial speed
 		Polars:  &polars.RealisticPolar{},
@@ -39,9 +39,8 @@ func NewGame() *GameState {
 	}
 	arena := &world.Arena{
 		Marks: []*world.Mark{
-			{Pos: geometry.Point{X: ScreenWidth / 2, Y: 50}, Name: "Upwind"},
-			{Pos: geometry.Point{X: 100, Y: ScreenHeight - 200}, Name: "Pin"},
-			{Pos: geometry.Point{X: ScreenWidth - 100, Y: ScreenHeight - 200}, Name: "Committee"},
+			{Pos: geometry.Point{X: 400, Y: ScreenHeight - 400}, Name: "Pin"},
+			{Pos: geometry.Point{X: ScreenWidth - 400, Y: ScreenHeight - 400}, Name: "Committee"},
 		},
 	}
 	dash := &dashboard.Dashboard{
