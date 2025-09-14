@@ -41,6 +41,61 @@ func (d *Dashboard) CalculateDistanceToLine() float64 {
 	return -signedDistance
 }
 
+// CalculateVMG calculates the current VMG (Velocity Made Good) towards wind
+func (d *Dashboard) CalculateVMG() float64 {
+	windDir, _ := d.Wind.GetWind(d.Boat.Pos)
+	twa := d.Boat.Heading - windDir
+	if twa < -180 {
+		twa += 360
+	} else if twa > 180 {
+		twa -= 360
+	}
+	
+	// VMG = Speed * cos(TWA)
+	twaRad := twa * math.Pi / 180
+	return d.Boat.Speed * math.Cos(twaRad)
+}
+
+// FindBestVMG finds the best VMG achievable for current sailing mode (beat or run)
+func (d *Dashboard) FindBestVMG() float64 {
+	windDir, windSpeed := d.Wind.GetWind(d.Boat.Pos)
+	twa := d.Boat.Heading - windDir
+	if twa < -180 {
+		twa += 360
+	} else if twa > 180 {
+		twa -= 360
+	}
+	
+	absTWA := math.Abs(twa)
+	bestVMG := 0.0
+	
+	if absTWA < 90 {
+		// Upwind sailing - find best beat VMG (positive VMG towards wind)
+		for angle := 30.0; angle <= 90.0; angle += 1.0 {
+			speed := d.Boat.Polars.GetBoatSpeed(angle, windSpeed)
+			angleRad := angle * math.Pi / 180
+			vmg := speed * math.Cos(angleRad)
+			
+			if vmg > bestVMG {
+				bestVMG = vmg
+			}
+		}
+	} else {
+		// Downwind sailing - find best run VMG (negative VMG away from wind)
+		for angle := 90.0; angle <= 180.0; angle += 1.0 {
+			speed := d.Boat.Polars.GetBoatSpeed(angle, windSpeed)
+			angleRad := angle * math.Pi / 180
+			vmg := speed * math.Cos(angleRad)
+			
+			if vmg < bestVMG {
+				bestVMG = vmg
+			}
+		}
+	}
+	
+	return bestVMG
+}
+
 func (d *Dashboard) Draw(screen *ebiten.Image) {
 	windDir, windSpeed := d.Wind.GetWind(d.Boat.Pos)
 	twa := d.Boat.Heading - windDir
@@ -51,10 +106,12 @@ func (d *Dashboard) Draw(screen *ebiten.Image) {
 	}
 
 	distanceToLine := d.CalculateDistanceToLine()
+	currentVMG := d.CalculateVMG()
+	targetVMG := d.FindBestVMG()
 
 	msg := fmt.Sprintf(
-		"Speed: %.1f kts\nHeading: %.0f°\nTWA: %.0f°\nTWS: %.1f kts\nDist to Line: %.0fm",
-		d.Boat.Speed, d.Boat.Heading, twa, windSpeed, distanceToLine,
+		"Speed: %.1f kts\nHeading: %.0f°\nTWA: %.0f°\nTWS: %.1f kts\nDist to Line: %.0fm\nVMG: %.1f kts\nTarget VMG: %.1f kts",
+		d.Boat.Speed, d.Boat.Heading, twa, windSpeed, distanceToLine, currentVMG, targetVMG,
 	)
 
 	ebitenutil.DebugPrintAt(screen, msg, screen.Bounds().Dx()-150, 10)
@@ -67,5 +124,5 @@ func (d *Dashboard) Draw(screen *ebiten.Image) {
 	minutes := int(remaining.Minutes())
 	seconds := int(remaining.Seconds()) % 60
 	timerMsg := fmt.Sprintf("Start: %02d:%02d", minutes, seconds)
-	ebitenutil.DebugPrintAt(screen, timerMsg, screen.Bounds().Dx()-150, 90)
+	ebitenutil.DebugPrintAt(screen, timerMsg, screen.Bounds().Dx()-150, 130)
 }

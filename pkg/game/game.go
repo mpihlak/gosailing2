@@ -20,7 +20,7 @@ const (
 	PixelsPerMeter = 1.0
 	WorldWidth     = 2000 // World is larger than screen
 	WorldHeight    = 1500
-	inputDelay     = 1 * time.Millisecond // Delay between keystroke readings
+	inputDelay     = 0 * time.Millisecond // Delay between keystroke readings
 )
 
 type GameState struct {
