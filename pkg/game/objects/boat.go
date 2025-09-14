@@ -58,7 +58,6 @@ func (b *Boat) Update() {
 
 	// Get target speed from polars
 	targetSpeed := b.Polars.GetBoatSpeed(twa, windSpeed)
-	b.Speed = targetSpeed // Keep this for display purposes
 
 	// Convert target speed to target velocity in heading direction
 	headingRad := b.Heading * math.Pi / 180
@@ -108,6 +107,10 @@ func (b *Boat) Update() {
 	// Move boat using actual velocity
 	b.Pos.X += b.VelX
 	b.Pos.Y += b.VelY
+
+	// Calculate actual current speed in knots for dashboard display
+	currentPixelSpeed := math.Sqrt(b.VelX*b.VelX + b.VelY*b.VelY)
+	b.Speed = currentPixelSpeed * 60.0 / speedScale // Convert back to knots
 
 	// Add to history
 	if time.Since(b.lastHistory) >= historyInterval {
