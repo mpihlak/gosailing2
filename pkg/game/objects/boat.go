@@ -110,7 +110,7 @@ func (b *Boat) Update() {
 	dragForce := dragCoefficient * currentSpeed * currentSpeed
 
 	// Calculate drag acceleration (F = ma, so a = F/m)
-	dragAccel := dragForce / boatMass * 20 // Reduced scale factor for gentler deceleration
+	dragAccel := dragForce / boatMass * 10 // Reduced scale factor for slower deceleration (was 20)
 
 	// Apply drag in opposite direction of movement
 	if currentSpeed > 0.01 { // Avoid division by zero
@@ -122,7 +122,7 @@ func (b *Boat) Update() {
 
 	// Apply force towards target velocity (wind power)
 	// This simulates the boat's ability to accelerate towards the polar speed
-	accelerationFactor := 0.02 // Reduced for more gradual acceleration
+	accelerationFactor := 0.01 // Reduced for slower acceleration (was 0.02)
 	b.VelX += (targetVelX - b.VelX) * accelerationFactor
 	b.VelY += (targetVelY - b.VelY) * accelerationFactor
 
