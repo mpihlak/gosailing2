@@ -36,9 +36,11 @@ type GameState struct {
 	lastInput      time.Time // Last time input was processed
 	isPaused       bool      // Game pause state
 	lastPauseInput time.Time // Last time pause key was pressed
-	// Race start timer
-	startTime   time.Time // Time when race starts (2 minutes from game start)
-	raceStarted bool      // Whether the race has started
+	// Race start timer (elapsed time based for pause support)
+	timerDuration  time.Duration // Total duration for race start (1 minute)
+	elapsedTime    time.Duration // Time elapsed since game start (only when not paused)
+	lastUpdateTime time.Time     // Last time Update was called (for calculating delta)
+	raceStarted    bool          // Whether the race has started
 	// OCS detection
 	isOCS bool // Whether boat is On Course Side
 	// Restart banner
@@ -105,16 +107,20 @@ func NewGame() *GameState {
 	cameraY := lineY - float64(ScreenHeight)/2 + 100        // Show line and area below
 
 	return &GameState{
-		Boat:        boat,
-		Arena:       arena,
-		Wind:        wind,
-		Dashboard:   dash,
-		CameraX:     cameraX,
-		CameraY:     cameraY,
-		isPaused:    true,                            // Start game in paused mode
-		startTime:   time.Now().Add(1 * time.Minute), // Race starts in 1 minute
-		raceStarted: false,
-		isOCS:       false,
+		Boat:              boat,
+		Arena:             arena,
+		Wind:              wind,
+		Dashboard:         dash,
+		CameraX:           cameraX,
+		CameraY:           cameraY,
+		isPaused:          true,            // Start game in paused mode
+		timerDuration:     1 * time.Minute, // Race starts after 1 minute
+		elapsedTime:       0,               // No time elapsed yet
+		lastUpdateTime:    time.Now(),      // Initialize update time
+		raceStarted:       false,
+		isOCS:             false,
+		showRestartBanner: false,
+		restartBannerTime: time.Time{},
 	}
 }
 
@@ -138,6 +144,10 @@ func (g *GameState) Update() error {
 	// Handle pause toggle
 	if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
 		g.isPaused = !g.isPaused
+		if !g.isPaused {
+			// Reset last update time when unpausing to avoid large time jump
+			g.lastUpdateTime = time.Now()
+		}
 	}
 
 	// Don't update game logic when paused
@@ -145,13 +155,19 @@ func (g *GameState) Update() error {
 		return nil
 	}
 
+	// Update elapsed time (only when not paused)
+	now := time.Now()
+	deltaTime := now.Sub(g.lastUpdateTime)
+	g.elapsedTime += deltaTime
+	g.lastUpdateTime = now
+
 	// Hide restart banner after 2 seconds
 	if g.showRestartBanner && time.Since(g.restartBannerTime) > 2*time.Second {
 		g.showRestartBanner = false
 	}
 
-	// Check race start timer
-	if !g.raceStarted && time.Now().After(g.startTime) {
+	// Check race start timer based on elapsed time
+	if !g.raceStarted && g.elapsedTime >= g.timerDuration {
 		g.raceStarted = true
 	}
 
@@ -164,6 +180,12 @@ func (g *GameState) Update() error {
 			g.isOCS = true
 		} else if g.isOCS && g.Boat.Pos.Y > startLineY {
 			// Clear OCS only when boat dips below the line
+			g.isOCS = false
+		}
+	} else {
+		// After race start, only clear OCS if boat goes below the line
+		// (boat can still be OCS from before race start)
+		if g.isOCS && g.Boat.Pos.Y > startLineY {
 			g.isOCS = false
 		}
 	}
@@ -244,10 +266,10 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	screen.DrawImage(worldImage, op)
 
 	// Draw dashboard directly to screen (UI always visible)
-	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.startTime)
+	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.timerDuration, g.elapsedTime)
 
-	// Show START banner when race just started
-	if g.raceStarted && time.Since(g.startTime) < 3*time.Second {
+	// Show START banner when race just started (for 3 seconds after race start)
+	if g.raceStarted && g.elapsedTime-g.timerDuration < 3*time.Second {
 		g.drawStartBanner(screen)
 	}
 

@@ -97,7 +97,7 @@ func (d *Dashboard) FindBestVMG() float64 {
 	return bestVMG
 }
 
-func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, startTime time.Time) {
+func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, timerDuration time.Duration, elapsedTime time.Duration) {
 	windDir, windSpeed := d.Wind.GetWind(d.Boat.Pos)
 	twa := d.Boat.Heading - windDir
 	if twa < -180 {
@@ -119,7 +119,7 @@ func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, sta
 
 	// Race timer display
 	if !raceStarted {
-		remaining := time.Until(startTime)
+		remaining := timerDuration - elapsedTime
 		if remaining < 0 {
 			remaining = 0
 		}
@@ -131,8 +131,8 @@ func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, sta
 		ebitenutil.DebugPrintAt(screen, "RACE STARTED", screen.Bounds().Dx()-150, 130)
 	}
 
-	// OCS warning
-	if isOCS && !raceStarted {
+	// OCS warning - show during pre-start or if boat was OCS when race started
+	if isOCS {
 		// Draw red background rectangle for OCS warning
 		ocsX := screen.Bounds().Dx() - 150
 		ocsY := 150
