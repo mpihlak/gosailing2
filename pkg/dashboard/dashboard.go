@@ -139,14 +139,15 @@ func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, tim
 		timerMsg := fmt.Sprintf("Start: %02d:%02d", minutes, seconds)
 		ebitenutil.DebugPrintAt(screen, timerMsg, screen.Bounds().Dx()-150, 130)
 	} else {
-		ebitenutil.DebugPrintAt(screen, "RACE STARTED", screen.Bounds().Dx()-150, 130)
+		// Display RACE STARTED at top center of screen
+		ebitenutil.DebugPrintAt(screen, "RACE STARTED", screen.Bounds().Dx()/2-50, 10)
 	}
 
 	// OCS warning - show during pre-start or if boat was OCS when race started
 	if isOCS {
-		// Draw red background rectangle for OCS warning
-		ocsX := screen.Bounds().Dx() - 150
-		ocsY := 150
+		// Display OCS warning at top center of screen, below RACE STARTED
+		ocsY := 30 // Below RACE STARTED which is at Y=10
+		ocsX := screen.Bounds().Dx()/2 - 40 // Center horizontally
 		ocsWidth := 80
 		ocsHeight := 15
 

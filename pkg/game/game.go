@@ -206,7 +206,8 @@ func (g *GameState) Update() error {
 		}
 
 		// Line crossing detection after race start
-		if !g.hasCrossedLine {
+		// Only count line crossing if boat is not currently OCS (has cleared OCS properly)
+		if !g.hasCrossedLine && !g.isOCS {
 			bowPos := g.Boat.GetBowPosition()
 			// Check if bow crosses the starting line (from below to above)
 			if bowPos.Y <= startLineY {
