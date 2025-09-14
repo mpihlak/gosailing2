@@ -15,12 +15,11 @@ import (
 const (
 	maxHistoryPoints = 50
 	historyInterval  = 200 * time.Millisecond
-	boatHeight       = 15.0                  // Triangle height
-	boatWidth        = 7.5                   // Triangle width
-	speedScale       = 30.0 / 6.0            // Pixels per second per knot (10 pixels/sec at 6 knots)
-	boatMass         = 4000.0                // Boat mass in kg
-	dragCoefficient  = 0.02                  // Water resistance coefficient (reduced for more gradual deceleration)
-	inputDelay       = 30 * time.Millisecond // Delay between keystroke readings
+	boatHeight       = 15.0       // Triangle height
+	boatWidth        = 7.5        // Triangle width
+	speedScale       = 30.0 / 6.0 // Pixels per second per knot (10 pixels/sec at 6 knots)
+	boatMass         = 4000.0     // Boat mass in kg
+	dragCoefficient  = 0.02       // Water resistance coefficient (reduced for more gradual deceleration)
 )
 
 type Boat struct {
@@ -30,7 +29,6 @@ type Boat struct {
 	VelX, VelY  float64        // Actual velocity in pixels/frame
 	History     []geometry.Point
 	lastHistory time.Time
-	lastInput   time.Time     // Last time input was processed
 	Polars      polars.Polars // Polar performance data
 	Wind        world.Wind    // Wind interface to get wind conditions
 }
@@ -47,26 +45,6 @@ func (b *Boat) GetBowPosition() geometry.Point {
 }
 
 func (b *Boat) Update() {
-	// Input handling with delay to prevent overturning
-	if time.Since(b.lastInput) >= inputDelay {
-		if ebiten.IsKeyPressed(ebiten.KeyLeft) || ebiten.IsKeyPressed(ebiten.KeyA) {
-			b.Heading -= 2
-			b.lastInput = time.Now()
-		}
-		if ebiten.IsKeyPressed(ebiten.KeyRight) || ebiten.IsKeyPressed(ebiten.KeyD) {
-			b.Heading += 2
-			b.lastInput = time.Now()
-		}
-	}
-
-	// Normalize heading
-	if b.Heading < 0 {
-		b.Heading += 360
-	}
-	if b.Heading >= 360 {
-		b.Heading -= 360
-	}
-
 	// Get wind conditions at boat position
 	windDir, windSpeed := b.Wind.GetWind(b.Pos)
 

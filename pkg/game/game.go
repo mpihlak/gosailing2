@@ -20,6 +20,7 @@ const (
 	PixelsPerMeter = 1.0
 	WorldWidth     = 2000 // World is larger than screen
 	WorldHeight    = 1500
+	inputDelay     = 10 * time.Millisecond // Delay between keystroke readings
 )
 
 type GameState struct {
@@ -29,6 +30,7 @@ type GameState struct {
 	Dashboard *dashboard.Dashboard
 	CameraX   float64 // Camera offset for panning
 	CameraY   float64
+	lastInput time.Time // Last time input was processed
 }
 
 func NewGame() *GameState {
@@ -98,11 +100,24 @@ func NewGame() *GameState {
 }
 
 func (g *GameState) Update() error {
-	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
-		g.Boat.Heading -= 5
+	// Input handling with delay to prevent overturning
+	if time.Since(g.lastInput) >= inputDelay {
+		if ebiten.IsKeyPressed(ebiten.KeyLeft) || ebiten.IsKeyPressed(ebiten.KeyA) {
+			g.Boat.Heading -= 1
+			g.lastInput = time.Now()
+		}
+		if ebiten.IsKeyPressed(ebiten.KeyRight) || ebiten.IsKeyPressed(ebiten.KeyD) {
+			g.Boat.Heading += 1
+			g.lastInput = time.Now()
+		}
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyRight) {
-		g.Boat.Heading += 5
+
+	// Normalize heading
+	if g.Boat.Heading < 0 {
+		g.Boat.Heading += 360
+	}
+	if g.Boat.Heading >= 360 {
+		g.Boat.Heading -= 360
 	}
 
 	g.Boat.Update()
