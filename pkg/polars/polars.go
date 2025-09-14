@@ -18,11 +18,6 @@ func (rp *RealisticPolar) GetBoatSpeed(twa, tws float64) float64 {
 		absTWA = 360 - absTWA
 	}
 
-	// Can't sail closer than 30 degrees to wind
-	if absTWA < 30 {
-		return 0 // In irons
-	}
-
 	// Wind speed data points in the table
 	windSpeeds := []float64{4, 6, 8, 10, 12, 14, 16, 20, 24}
 
@@ -52,10 +47,15 @@ func (rp *RealisticPolar) GetBoatSpeed(twa, tws float64) float64 {
 		beatAngle := rp.interpolateFloat(tws, windSpeeds, beatAngles, windIndex)
 
 		if absTWA < beatAngle {
-			return 0 // Can't sail this close
+			// Instead of hard cutoff, interpolate from 0 speed at TWA=0 to beat VMG at beat angle
+			// Using quadratic curve for more aggressive tapering near zero
+			vmg := rp.interpolateFloat(tws, windSpeeds, beatVMG, windIndex)
+			// Quadratic interpolation: factor^2 gives more aggressive tapering
+			factor := absTWA / beatAngle
+			return vmg * factor * factor
 		}
 
-		// Interpolate between no-go zone and 52 degree speed
+		// Interpolate between beat angle and 52 degree speed
 		vmg := rp.interpolateFloat(tws, windSpeeds, beatVMG, windIndex)
 		speed52 := rp.getSpeedAtAngle(52, tws, windSpeeds, angles, speedTable)
 
