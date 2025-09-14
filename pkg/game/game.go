@@ -43,6 +43,12 @@ type GameState struct {
 	raceStarted    bool          // Whether the race has started
 	// OCS detection
 	isOCS bool // Whether boat is On Course Side
+	// Line crossing tracking
+	hasCrossedLine   bool          // Whether boat has crossed the starting line after race start
+	lineCrossingTime time.Duration // When boat crossed the line (elapsed time)
+	secondsLate      float64       // How many seconds late the boat was
+	vmgAtCrossing    float64       // VMG when crossing the line
+	vmgPercentage    float64       // VMG as percentage of optimal VMG
 	// Restart banner
 	showRestartBanner bool      // Whether to show restart banner
 	restartBannerTime time.Time // When restart banner was triggered
@@ -141,6 +147,16 @@ func (g *GameState) Update() error {
 		return nil
 	}
 
+	// Handle timer jump key
+	if inpututil.IsKeyJustPressed(ebiten.KeyJ) {
+		// Jump timer forward by 10 seconds
+		g.elapsedTime += 10 * time.Second
+		// If this pushes us past race start, trigger race start
+		if !g.raceStarted && g.elapsedTime >= g.timerDuration {
+			g.raceStarted = true
+		}
+	}
+
 	// Handle pause toggle
 	if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
 		g.isPaused = !g.isPaused
@@ -187,6 +203,27 @@ func (g *GameState) Update() error {
 		// (boat can still be OCS from before race start)
 		if g.isOCS && g.Boat.Pos.Y > startLineY {
 			g.isOCS = false
+		}
+
+		// Line crossing detection after race start
+		if !g.hasCrossedLine {
+			bowPos := g.Boat.GetBowPosition()
+			// Check if bow crosses the starting line (from below to above)
+			if bowPos.Y <= startLineY {
+				g.hasCrossedLine = true
+				g.lineCrossingTime = g.elapsedTime
+				// Calculate how late the boat was (time after race start)
+				g.secondsLate = (g.elapsedTime - g.timerDuration).Seconds()
+				// Calculate VMG at crossing
+				g.vmgAtCrossing = g.Dashboard.CalculateVMG()
+				// Calculate VMG percentage (compare to optimal VMG)
+				optimalVMG := g.Dashboard.FindBestVMG()
+				if optimalVMG > 0 {
+					g.vmgPercentage = (g.vmgAtCrossing / optimalVMG) * 100
+				} else {
+					g.vmgPercentage = 0
+				}
+			}
 		}
 	}
 
@@ -266,7 +303,7 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	screen.DrawImage(worldImage, op)
 
 	// Draw dashboard directly to screen (UI always visible)
-	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.timerDuration, g.elapsedTime)
+	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.timerDuration, g.elapsedTime, g.hasCrossedLine, g.secondsLate, g.vmgPercentage)
 
 	// Show START banner when race just started (for 3 seconds after race start)
 	if g.raceStarted && g.elapsedTime-g.timerDuration < 3*time.Second {
@@ -298,6 +335,7 @@ Controls:
   Left Arrow / A  - Turn Left
   Right Arrow / D - Turn Right
   Space           - Pause/Resume
+  J               - Jump Timer +10 sec
   R               - Restart Game
   Q               - Quit Game
 
