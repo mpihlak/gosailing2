@@ -20,7 +20,7 @@ const (
 	PixelsPerMeter = 1.0
 	WorldWidth     = 2000 // World is larger than screen
 	WorldHeight    = 1500
-	inputDelay     = 10 * time.Millisecond // Delay between keystroke readings
+	inputDelay     = 1 * time.Millisecond // Delay between keystroke readings
 )
 
 type GameState struct {
@@ -83,6 +83,8 @@ func NewGame() *GameState {
 		Boat:      boat,
 		Wind:      wind,
 		StartTime: time.Now().Add(5 * time.Minute),
+		LineStart: geometry.Point{X: pinX, Y: lineY},       // Pin end
+		LineEnd:   geometry.Point{X: committeeX, Y: lineY}, // Committee end
 	}
 
 	// Initialize camera to show full starting area (center on starting line)
