@@ -34,7 +34,7 @@ func NewGame() *GameState {
 		Pos:     geometry.Point{X: ScreenWidth / 2, Y: ScreenHeight - 100},
 		Heading: 90,
 		Speed:   1, // Initial speed
-		Polars:  &polars.SimplePolar{},
+		Polars:  &polars.RealisticPolar{},
 		Wind:    wind,
 	}
 	arena := &world.Arena{
