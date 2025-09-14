@@ -2,6 +2,7 @@ package world
 
 import (
 	"image/color"
+	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -22,7 +23,50 @@ type Arena struct {
 	Marks []*Mark
 }
 
+// drawDottedLine draws a dotted line between two points
+func (a *Arena) drawDottedLine(screen *ebiten.Image, x1, y1, x2, y2 float64, lineColor color.Color) {
+	dx := x2 - x1
+	dy := y2 - y1
+	distance := math.Sqrt(dx*dx + dy*dy)
+	
+	if distance == 0 {
+		return
+	}
+	
+	// Normalize direction vector
+	unitX := dx / distance
+	unitY := dy / distance
+	
+	// Draw dotted line with 5 pixel segments and 2.5 pixel gaps
+	segmentLength := 5.0
+	gapLength := 2.5
+	totalStep := segmentLength + gapLength
+	
+	for t := 0.0; t < distance; t += totalStep {
+		// Start of segment
+		startX := x1 + unitX*t
+		startY := y1 + unitY*t
+		
+		// End of segment (don't go beyond the line end)
+		endT := math.Min(t+segmentLength, distance)
+		endX := x1 + unitX*endT
+		endY := y1 + unitY*endT
+		
+		// Draw the segment
+		ebitenutil.DrawLine(screen, startX, startY, endX, endY, lineColor)
+	}
+}
+
 func (a *Arena) Draw(screen *ebiten.Image) {
+	// Draw starting line if we have exactly 2 marks (Pin and Committee)
+	if len(a.Marks) == 2 {
+		pin := a.Marks[0]
+		committee := a.Marks[1]
+		// Draw dotted line in white
+		a.drawDottedLine(screen, pin.Pos.X, pin.Pos.Y, committee.Pos.X, committee.Pos.Y, color.RGBA{255, 255, 255, 255})
+	}
+	
+	// Draw marks
 	for _, mark := range a.Marks {
 		mark.Draw(screen)
 	}

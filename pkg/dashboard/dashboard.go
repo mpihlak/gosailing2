@@ -50,7 +50,7 @@ func (d *Dashboard) CalculateVMG() float64 {
 	} else if twa > 180 {
 		twa -= 360
 	}
-	
+
 	// VMG = Speed * cos(TWA)
 	twaRad := twa * math.Pi / 180
 	return d.Boat.Speed * math.Cos(twaRad)
@@ -65,17 +65,17 @@ func (d *Dashboard) FindBestVMG() float64 {
 	} else if twa > 180 {
 		twa -= 360
 	}
-	
+
 	absTWA := math.Abs(twa)
 	bestVMG := 0.0
-	
+
 	if absTWA < 90 {
 		// Upwind sailing - find best beat VMG (positive VMG towards wind)
 		for angle := 30.0; angle <= 90.0; angle += 1.0 {
 			speed := d.Boat.Polars.GetBoatSpeed(angle, windSpeed)
 			angleRad := angle * math.Pi / 180
 			vmg := speed * math.Cos(angleRad)
-			
+
 			if vmg > bestVMG {
 				bestVMG = vmg
 			}
@@ -86,13 +86,13 @@ func (d *Dashboard) FindBestVMG() float64 {
 			speed := d.Boat.Polars.GetBoatSpeed(angle, windSpeed)
 			angleRad := angle * math.Pi / 180
 			vmg := speed * math.Cos(angleRad)
-			
+
 			if vmg < bestVMG {
 				bestVMG = vmg
 			}
 		}
 	}
-	
+
 	return bestVMG
 }
 
