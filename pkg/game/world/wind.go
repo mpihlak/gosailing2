@@ -1,6 +1,6 @@
 package world
 
-import "github.com/mpihlak/ebiten-sailing/pkg/geometry"
+import "github.com/mpihlak/gosailing2/pkg/geometry"
 
 type Wind interface {
 	GetWind(pos geometry.Point) (direction, speed float64)

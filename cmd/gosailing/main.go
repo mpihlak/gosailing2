@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/mpihlak/ebiten-sailing/pkg/game"
+	"github.com/mpihlak/gosailing2/pkg/game"
 )
 
 func main() {

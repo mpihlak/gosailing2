@@ -10,11 +10,11 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
-	"github.com/mpihlak/ebiten-sailing/pkg/dashboard"
-	"github.com/mpihlak/ebiten-sailing/pkg/game/objects"
-	"github.com/mpihlak/ebiten-sailing/pkg/game/world"
-	"github.com/mpihlak/ebiten-sailing/pkg/geometry"
-	"github.com/mpihlak/ebiten-sailing/pkg/polars"
+	"github.com/mpihlak/gosailing2/pkg/dashboard"
+	"github.com/mpihlak/gosailing2/pkg/game/objects"
+	"github.com/mpihlak/gosailing2/pkg/game/world"
+	"github.com/mpihlak/gosailing2/pkg/geometry"
+	"github.com/mpihlak/gosailing2/pkg/polars"
 )
 
 const (

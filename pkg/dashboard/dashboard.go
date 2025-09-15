@@ -8,9 +8,9 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
-	"github.com/mpihlak/ebiten-sailing/pkg/game/objects"
-	"github.com/mpihlak/ebiten-sailing/pkg/game/world"
-	"github.com/mpihlak/ebiten-sailing/pkg/geometry"
+	"github.com/mpihlak/gosailing2/pkg/game/objects"
+	"github.com/mpihlak/gosailing2/pkg/game/world"
+	"github.com/mpihlak/gosailing2/pkg/geometry"
 )
 
 type Dashboard struct {

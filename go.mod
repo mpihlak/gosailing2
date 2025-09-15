@@ -1,8 +1,8 @@
-module github.com/mpihlak/ebiten-sailing
+module github.com/mpihlak/gosailing2
 
 go 1.22.2
 
-replace github.com/mpihlak/ebiten-sailing => ./
+replace github.com/mpihlak/gosailing2 => ./
 
 require github.com/hajimehoshi/ebiten/v2 v2.8.8
 

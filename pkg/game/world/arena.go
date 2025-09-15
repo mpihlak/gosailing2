@@ -4,9 +4,9 @@ import (
 	"image/color"
 	"math"
 
-	"github.com/hajimehoshi/ebiten/v2"
+		"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
-	"github.com/mpihlak/ebiten-sailing/pkg/geometry"
+	"github.com/mpihlak/gosailing2/pkg/geometry"
 )
 
 type Mark struct {
