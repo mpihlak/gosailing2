@@ -21,27 +21,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21'
-
-    - name: Create web directory
-      run: mkdir -p web
-
-    - name: Build WASM
-      run: |
-        GOOS=js GOARCH=wasm go build -o web/sailing.wasm ./cmd/gosailing
-
-    - name: Copy wasm_exec.js
-      run: |
-        cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" web/
-
-
-    - name: Copy HTML file
-      run: |
-        cp web/index.html web/index.html.backup || true
-
     - name: Setup Pages
       uses: actions/configure-pages@v3
 
@@ -60,4 +39,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4
