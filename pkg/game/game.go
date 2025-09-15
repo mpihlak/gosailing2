@@ -175,7 +175,25 @@ func (g *GameState) Update() error {
 	}
 
 	// Handle pause toggle (keyboard or mobile)
-	if inpututil.IsKeyJustPressed(ebiten.KeySpace) || mobileInput.PausePressed {
+	pauseTogglePressed := inpututil.IsKeyJustPressed(ebiten.KeySpace) || mobileInput.PausePressed
+	
+	// On mobile, any touch when paused should unpause (except on buttons)
+	if g.isPaused && g.mobileControls.hasTouchInput {
+		justPressedTouchIDs := inpututil.AppendJustPressedTouchIDs(nil)
+		for _, touchID := range justPressedTouchIDs {
+			x, y := ebiten.TouchPosition(touchID)
+			// Only unpause if touch is not on any mobile control buttons
+			if !g.mobileControls.pauseButton.Contains(x, y) &&
+			   !g.mobileControls.menuButton.Contains(x, y) &&
+			   !g.mobileControls.restartButton.Contains(x, y) &&
+			   !g.mobileControls.timerButton.Contains(x, y) {
+				pauseTogglePressed = true
+				break
+			}
+		}
+	}
+	
+	if pauseTogglePressed {
 		g.isPaused = !g.isPaused
 		if !g.isPaused {
 			// Reset last update time when unpausing to avoid large time jump
@@ -353,13 +371,48 @@ func (g *GameState) drawHelpScreen(screen *ebiten.Image) {
 	// Draw semi-transparent overlay using vector instead of creating new image
 	vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, color.RGBA{0, 0, 0, 180}, false)
 
-	// Help text with platform-specific quit behavior
-	quitText := "Quit Game"
-	if IsWASM() {
-		quitText = "Pause Game"
-	}
+	var helpText string
+	
+	// Check if we're on mobile (touch input detected)
+	if g.mobileControls.hasTouchInput {
+		// Mobile help text - focus on game explanation, not controls
+		helpText = `SAILING GAME - PAUSED
 
-	helpText := fmt.Sprintf(`SAILING GAME - PAUSED
+How to Play:
+  🎯 Start racing when the timer reaches zero
+  ⚠️  Avoid being OCS (On Course Side) at start
+  🏁 Cross the starting line after race begins
+  💨 Use wind angles for optimal speed
+
+Touch Controls:
+  Left/Right sides  - Steer the boat
+  Pause button (⏸)  - Pause/Resume game
+  Menu button (☰)   - Show restart & timer options
+  
+Dashboard Info:
+  Speed     - Current boat speed in knots
+  Heading   - Boat direction (0-360°)
+  TWA       - True Wind Angle (-180 to +180°)
+  TWS       - True Wind Speed in knots
+  VMG       - Velocity Made Good (speed toward wind)
+  Target VMG - Best achievable VMG for conditions
+  Dist to Line - Distance to starting line
+
+Tap anywhere to continue...`
+	} else {
+		// Desktop help text - include keyboard shortcuts
+		quitText := "Quit Game"
+		if IsWASM() {
+			quitText = "Pause Game"
+		}
+
+		helpText = fmt.Sprintf(`SAILING GAME - PAUSED
+
+How to Play:
+  🎯 Start racing when the timer reaches zero
+  ⚠️  Avoid being OCS (On Course Side) at start  
+  🏁 Cross the starting line after race begins
+  💨 Use wind angles for optimal speed
 
 Controls:
   Left Arrow / A  - Turn Left
@@ -369,15 +422,17 @@ Controls:
   R               - Restart Game
   Q               - %s
 
-Dashboard:
-  Speed     - Current boat speed
+Dashboard Info:
+  Speed     - Current boat speed in knots
   Heading   - Boat direction (0-360°)
-  TWA       - True Wind Angle
-  TWS       - True Wind Speed
-  VMG       - Velocity Made Good
-  Target VMG - Best achievable VMG
+  TWA       - True Wind Angle (-180 to +180°)
+  TWS       - True Wind Speed in knots
+  VMG       - Velocity Made Good (speed toward wind)
+  Target VMG - Best achievable VMG for conditions
+  Dist to Line - Distance to starting line
 
 Press SPACE to continue...`, quitText)
+	}
 
 	// Center the help text
 	bounds := screen.Bounds()
