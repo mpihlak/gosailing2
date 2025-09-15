@@ -176,7 +176,7 @@ func (g *GameState) Update() error {
 
 	// Handle pause toggle (keyboard or mobile)
 	pauseTogglePressed := inpututil.IsKeyJustPressed(ebiten.KeySpace) || mobileInput.PausePressed
-	
+
 	// On mobile, any touch when paused should unpause (except on buttons)
 	if g.isPaused && g.mobileControls.hasTouchInput {
 		justPressedTouchIDs := inpututil.AppendJustPressedTouchIDs(nil)
@@ -184,15 +184,15 @@ func (g *GameState) Update() error {
 			x, y := ebiten.TouchPosition(touchID)
 			// Only unpause if touch is not on any mobile control buttons
 			if !g.mobileControls.pauseButton.Contains(x, y) &&
-			   !g.mobileControls.menuButton.Contains(x, y) &&
-			   !g.mobileControls.restartButton.Contains(x, y) &&
-			   !g.mobileControls.timerButton.Contains(x, y) {
+				!g.mobileControls.menuButton.Contains(x, y) &&
+				!g.mobileControls.restartButton.Contains(x, y) &&
+				!g.mobileControls.timerButton.Contains(x, y) {
 				pauseTogglePressed = true
 				break
 			}
 		}
 	}
-	
+
 	if pauseTogglePressed {
 		g.isPaused = !g.isPaused
 		if !g.isPaused {
@@ -372,7 +372,7 @@ func (g *GameState) drawHelpScreen(screen *ebiten.Image) {
 	vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, color.RGBA{0, 0, 0, 180}, false)
 
 	var helpText string
-	
+
 	// Check if we're on mobile (touch input detected)
 	if g.mobileControls.hasTouchInput {
 		// Mobile help text - focus on game explanation, not controls
@@ -388,7 +388,7 @@ Touch Controls:
   Left/Right sides  - Steer the boat
   Pause button (⏸)  - Pause/Resume game
   Menu button (☰)   - Show restart & timer options
-  
+
 Dashboard Info:
   Speed     - Current boat speed in knots
   Heading   - Boat direction (0-360°)
@@ -410,7 +410,7 @@ Tap anywhere to continue...`
 
 How to Play:
   🎯 Start racing when the timer reaches zero
-  ⚠️  Avoid being OCS (On Course Side) at start  
+  ⚠️  Avoid being OCS (On Course Side) at start
   🏁 Cross the starting line after race begins
   💨 Use wind angles for optimal speed
 
