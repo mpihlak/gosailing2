@@ -63,38 +63,40 @@ Strength will reduce. The direction will change
 
 ## Visualisations
 
-Wind direction and strenght are displayed as equally spaced arrows in grid structure all over
-the arena. The direction of the arrow indicates wind direction. The tail of the arrow indicates
-strength.
+Wind direction and strenght are displayed as equally spaced arrows in grid
+structure all over the arena. The direction of the arrow indicates wind
+direction. The tail of the arrow indicates strength.
 
 ## Race course
 
-Start line. Defined as dotted line drawn between the committee boat and the pin end mark.
-Displayed in the lower half of the screen so that there is sufficient room to define a
-starting area that can be navigated by the boats.
+Start line. Defined as dotted line drawn between the committee boat and the pin
+end mark. Displayed in the lower half of the screen so that there is sufficient
+room to define a starting area that can be navigated by the boats.
 
 Upwind mark is placed at the top of the screen in the center.
 
-The race starts at a designated time. After the start time the boats may cross the starting line
-by sailing between the committee boat and pin end mark. They then sail up to the upwind mark, changing
-tacks as necessary. They round the upwind mark by leaving it to the port side. Then they sail down
-back to the starting line and finish the race by sailing between the committee boat and the pin end mark.
+The race starts at a designated time. After the start time the boats may cross
+the starting line by sailing between the committee boat and pin end mark. They
+then sail up to the upwind mark, changing tacks as necessary. They round the
+upwind mark by leaving it to the port side. Then they sail down back to the
+starting line and finish the race by sailing between the committee boat and the
+pin end mark.
 
 The boat that finishes first is the winner.
 
 ## Start
 
-There is a 5 minute timer that is started before the race start. During that time the boats position
-themselves in the best possible position so that they can cross the starting line at a good position
-with good speed and on time.
+There is a 5 minute timer that is started before the race start. During that
+time the boats position themselves in the best possible position so that they
+can cross the starting line at a good position with good speed and on time.
 
 ## Implementation
 
 ## Technology
 
-The game will be implemented in the Go programming language, using Ebitengine for graphics. Eventually
-it will also need to run in a browser on a mobile device (using WASM). Initial version will run
-natively.
+The game will be implemented in the Go programming language, using Ebitengine
+for graphics. Eventually it will also need to run in a browser on a mobile
+device (using WASM). Initial version will run natively.
 
 ## Gameplay
 
@@ -106,32 +108,36 @@ direction in 5 degree increments. Automatically change tacks when passing head
 to wind (similarly when going downwind). Calculate boat speed based on the
 given table of wind speeds and directions.
 
-When boat is turned head to wind it will gradually stop. It will only re-accelerate when
-pointed away from the wind. The acceleration is also gradual.
+When boat is turned head to wind it will gradually stop. It will only
+re-accelerate when pointed away from the wind. The acceleration is also
+gradual.
 
 In the initial version there is no starting procedure, it is just free sailing.
 
 ## Graphics
 
-Simple vector graphics.
-
-Light blue background indicates the sea.
-Little flag indicates marks.
-Boats are represented as polygons resembling the shape of sailboat as seen from above.
-Sailboats also have a little boom that indicates the tack they are on.
+Simple vector graphics. Light blue background indicates the sea. Little flag
+indicates marks. Boats are represented as polygons resembling the shape of
+sailboat as seen from above. Sailboats also have a little boom that indicates
+the tack they are on.
 
 ## Design
 
-The software design of the game shall be modular, with each module being separately testable.
-The modules could be go structs. We want structs to represent the major objects - boat, mark,
-committe boat, arena, race course, base wind, wind shadows.
+The software design of the game shall be modular, with each module being
+separately testable. The modules could be go structs. We want structs to
+represent the major objects - boat, mark, committe boat, arena, race course,
+base wind, wind shadows.
 
-These structs should provide a simple interface that can be later adjusted to introduce additional
-behaviors.
+These structs should provide a simple interface that can be later adjusted to
+introduce additional behaviors.
 
 ## MVP
 
-The wind should be modelled such that the we could ask wind data through an interface. We would specify the location on the race course and the interface would return  the wind at that location. The implementation could be later changed to include wind shifts, shadows, etc. But the interface should not change much.
+The wind should be modelled such that the we could ask wind data through an
+interface. We would specify the location on the race course and the interface
+would return  the wind at that location. The implementation could be later
+changed to include wind shifts, shadows, etc. But the interface should not
+change much.
 
 Collisions between boats and objects. In the MVP we would handle collisions as
 game ending events. The collision detection could be initially very simple (ie.
@@ -139,15 +145,15 @@ treat objects as point and radius and boat as simply a point). In the next
 iteration we might come up with a more sophisticated approach and also consider
 boat on boat collisions.
 
-Controls will be "arcade style" in the MVP. There's no adjustments to sail trim,
-etc.
+Controls will be "arcade style" in the MVP. There's no adjustments to sail
+trim, etc.
 
 The boat should initially move at a speed that would be equivalent of 6 kts
 boatspeed in the real world.
 
-Interaction and game state. There would be an overall GameState central structure that
-keeps track of boat locations, marks, general wind as well as specific wind
-conditions. The GameState supports the methods require by the Ebitengine, so
-it would have Update, Draw and other required methods.
+Interaction and game state. There would be an overall GameState central
+structure that keeps track of boat locations, marks, general wind as well as
+specific wind conditions. The GameState supports the methods require by the
+Ebitengine, so it would have Update, Draw and other required methods.
 
 Directory layout. Use cmd for any binaries and pkg for projects packages.

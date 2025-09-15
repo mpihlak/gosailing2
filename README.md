@@ -1,6 +1,6 @@
 # Go Sailing Game 🚢
 
-A realistic sailing simulation built with Go and Ebitengine, playable both as a desktop application and in web browsers via WebAssembly.
+A realistic sailing simulation built with LLMs, Go and Ebitengine, playable both as a desktop application and in web browsers via WebAssembly.
 
 ## Features
 
