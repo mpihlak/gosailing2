@@ -35,7 +35,8 @@ jobs:
 
     - name: Copy wasm_exec.js
       run: |
-        cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" web/
+        cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" web/
+
 
     - name: Copy HTML file
       run: |
