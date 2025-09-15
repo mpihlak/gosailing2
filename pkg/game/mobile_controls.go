@@ -1,6 +1,7 @@
 package game
 
 import (
+	"fmt"
 	"image/color"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -11,15 +12,22 @@ import (
 
 // MobileControls handles touch-based input for mobile devices
 type MobileControls struct {
-	// Touch steering zones
-	leftSteerZone  TouchZone
-	rightSteerZone TouchZone
+	// Touch button zones
+	leftButton  TouchZone
+	rightButton TouchZone
+	pauseButton TouchZone
 
-	// UI button zones
-	pauseButton   TouchZone
+	// Additional UI button zones (for menu functionality)
 	menuButton    TouchZone
 	restartButton TouchZone
 	timerButton   TouchZone
+
+	// Button press states
+	leftPressed    bool
+	rightPressed   bool
+	pausePressed   bool
+	restartPressed bool
+	timerPressed   bool
 
 	// State
 	menuOpen      bool
@@ -35,41 +43,43 @@ type TouchZone struct {
 
 // NewMobileControls creates a new mobile controls instance
 func NewMobileControls(screenWidth, screenHeight int) *MobileControls {
-	buttonSize := 60
+	buttonSize := 80
 	margin := 20
 
 	return &MobileControls{
-		// Steering zones take up left and right thirds of screen
-		leftSteerZone: TouchZone{
-			X: 0, Y: 0,
-			Width: screenWidth / 3, Height: screenHeight,
+		// Left arrow button in lower left corner
+		leftButton: TouchZone{
+			X: margin, Y: screenHeight - buttonSize - margin,
+			Width: buttonSize, Height: buttonSize,
 			Enabled: true,
 		},
-		rightSteerZone: TouchZone{
-			X: (screenWidth * 2) / 3, Y: 0,
-			Width: screenWidth / 3, Height: screenHeight,
+		// Right arrow button in lower right corner
+		rightButton: TouchZone{
+			X: screenWidth - buttonSize - margin, Y: screenHeight - buttonSize - margin,
+			Width: buttonSize, Height: buttonSize,
+			Enabled: true,
+		},
+		// Pause/play button in center bottom
+		pauseButton: TouchZone{
+			X: screenWidth/2 - buttonSize/2, Y: screenHeight - buttonSize - margin,
+			Width: buttonSize, Height: buttonSize,
 			Enabled: true,
 		},
 
-		// UI buttons in corners
-		pauseButton: TouchZone{
-			X: screenWidth - buttonSize - margin, Y: margin,
-			Width: buttonSize, Height: buttonSize,
-			Enabled: true,
-		},
+		// Menu button in top left corner (for additional options)
 		menuButton: TouchZone{
 			X: margin, Y: margin,
-			Width: buttonSize, Height: buttonSize,
+			Width: buttonSize / 2, Height: buttonSize / 2,
 			Enabled: true,
 		},
 		restartButton: TouchZone{
-			X: margin, Y: margin + buttonSize + 10,
-			Width: buttonSize, Height: buttonSize,
+			X: margin, Y: margin + buttonSize/2 + 10,
+			Width: buttonSize / 2, Height: buttonSize / 2,
 			Enabled: false, // Only shown when menu is open
 		},
 		timerButton: TouchZone{
-			X: margin, Y: margin + (buttonSize+10)*2,
-			Width: buttonSize, Height: buttonSize,
+			X: margin, Y: margin + buttonSize + 20,
+			Width: buttonSize / 2, Height: buttonSize / 2,
 			Enabled: false, // Only shown when menu is open
 		},
 	}
@@ -82,53 +92,72 @@ func (tz *TouchZone) Contains(x, y int) bool {
 		y >= tz.Y && y < tz.Y+tz.Height
 }
 
-// Update processes touch input and returns control actions
-func (mc *MobileControls) Update() MobileInput {
-	input := MobileInput{}
+// Update processes touch input for mobile controls
+func (mc *MobileControls) Update() {
+	// Reset button press states
+	mc.leftPressed = false
+	mc.rightPressed = false
+	mc.pausePressed = false
+	mc.restartPressed = false
+	mc.timerPressed = false
 
-	// Get all current touches
+	// Check for any touch input to determine if this is a mobile device
 	touchIDs := ebiten.AppendTouchIDs(nil)
-
-	// Get just pressed touches for button handling
-	justPressedTouchIDs := inpututil.AppendJustPressedTouchIDs(nil)
-
-	// Track if we've ever seen touch input (indicates mobile device)
-	if len(touchIDs) > 0 || len(justPressedTouchIDs) > 0 {
+	if len(touchIDs) > 0 && !mc.hasTouchInput {
 		mc.hasTouchInput = true
 	}
 
-	// Process just pressed touches for button actions
-	for _, touchID := range justPressedTouchIDs {
-		x, y := ebiten.TouchPosition(touchID)
+	if !mc.hasTouchInput {
+		return
+	}
 
-		// Handle button presses
+	// Get all current touches (including held touches)
+	currentTouchIDs := ebiten.AppendTouchIDs(nil)
+
+	// Check each button for current touches (held down)
+	for _, id := range currentTouchIDs {
+		x, y := ebiten.TouchPosition(id)
+
+		if mc.leftButton.Contains(x, y) {
+			mc.leftPressed = true
+		}
+		if mc.rightButton.Contains(x, y) {
+			mc.rightPressed = true
+		}
+	}
+
+	// Get just pressed touches for one-time button interactions (pause, menu, etc.)
+	justPressedTouchIDs := inpututil.AppendJustPressedTouchIDs(nil)
+
+	// Check menu and action buttons for just pressed touches
+	for _, id := range justPressedTouchIDs {
+		x, y := ebiten.TouchPosition(id)
+
 		if mc.pauseButton.Contains(x, y) {
-			input.PausePressed = true
-		} else if mc.menuButton.Contains(x, y) {
+			mc.pausePressed = true
+		}
+		if mc.menuButton.Contains(x, y) {
 			mc.menuOpen = !mc.menuOpen
 			mc.updateMenuButtons()
-		} else if mc.restartButton.Contains(x, y) && mc.menuOpen {
-			input.RestartPressed = true
-			mc.menuOpen = false
-			mc.updateMenuButtons()
-		} else if mc.timerButton.Contains(x, y) && mc.menuOpen {
-			input.TimerJumpPressed = true
+		}
+		if mc.restartButton.Contains(x, y) && mc.restartButton.Enabled {
+			mc.restartPressed = true
+		}
+		if mc.timerButton.Contains(x, y) && mc.timerButton.Enabled {
+			mc.timerPressed = true
 		}
 	}
+}
 
-	// Process all current touches for continuous steering
-	for _, touchID := range touchIDs {
-		x, y := ebiten.TouchPosition(touchID)
-
-		// Handle continuous steering input
-		if mc.leftSteerZone.Contains(x, y) {
-			input.TurnLeft = true
-		} else if mc.rightSteerZone.Contains(x, y) {
-			input.TurnRight = true
-		}
+// GetMobileInput returns the current mobile input state
+func (mc *MobileControls) GetMobileInput() MobileInput {
+	return MobileInput{
+		TurnLeft:         mc.leftPressed,
+		TurnRight:        mc.rightPressed,
+		PausePressed:     mc.pausePressed,
+		RestartPressed:   mc.restartButton.Enabled && mc.restartPressed,
+		TimerJumpPressed: mc.timerButton.Enabled && mc.timerPressed,
 	}
-
-	return input
 }
 
 // updateMenuButtons toggles visibility of menu-related buttons
@@ -147,49 +176,62 @@ type MobileInput struct {
 }
 
 // Draw renders the mobile control elements on screen
-func (mc *MobileControls) Draw(screen *ebiten.Image) {
-	// Only draw controls if we've detected touch input (mobile device)
+func (mc *MobileControls) Draw(screen *ebiten.Image, isPaused bool) {
+	// Only show controls if we've detected touch input (actual mobile device)
 	if !mc.hasTouchInput {
 		return
 	}
 
-	// Get current touches for highlighting active zones
-	touchIDs := ebiten.AppendTouchIDs(nil)
-
-	// Draw steering zones (subtle overlay when active)
-	for _, touchID := range touchIDs {
-		x, y := ebiten.TouchPosition(touchID)
-
-		if mc.leftSteerZone.Contains(x, y) {
-			// Draw left steering indicator
-			vector.DrawFilledRect(screen,
-				float32(mc.leftSteerZone.X), float32(mc.leftSteerZone.Y),
-				float32(mc.leftSteerZone.Width), float32(mc.leftSteerZone.Height),
-				color.RGBA{255, 255, 255, 30}, false)
-			ebitenutil.DebugPrintAt(screen, "◀ TURN LEFT", 20, mc.leftSteerZone.Height/2)
-		}
-
-		if mc.rightSteerZone.Contains(x, y) {
-			// Draw right steering indicator
-			vector.DrawFilledRect(screen,
-				float32(mc.rightSteerZone.X), float32(mc.rightSteerZone.Y),
-				float32(mc.rightSteerZone.Width), float32(mc.rightSteerZone.Height),
-				color.RGBA{255, 255, 255, 30}, false)
-			ebitenutil.DebugPrintAt(screen, "TURN RIGHT ▶", mc.rightSteerZone.X+20, mc.rightSteerZone.Height/2)
-		}
+	// Draw left arrow button
+	leftColor := color.RGBA{100, 100, 100, 200}
+	if mc.leftPressed {
+		leftColor = color.RGBA{150, 150, 150, 220} // Highlighted when pressed
 	}
+	mc.drawButton(screen, mc.leftButton, "◀", leftColor)
 
-	// Draw pause button
-	mc.drawButton(screen, mc.pauseButton, "⏸", color.RGBA{100, 100, 100, 200})
+	// Draw right arrow button
+	rightColor := color.RGBA{100, 100, 100, 200}
+	if mc.rightPressed {
+		rightColor = color.RGBA{150, 150, 150, 220} // Highlighted when pressed
+	}
+	mc.drawButton(screen, mc.rightButton, "▶", rightColor)
 
-	// Draw menu button
-	mc.drawButton(screen, mc.menuButton, "☰", color.RGBA{100, 100, 100, 200})
+	// Draw pause/play button in center
+	pauseColor := color.RGBA{120, 120, 120, 200}
+	if mc.pausePressed {
+		pauseColor = color.RGBA{170, 170, 170, 220} // Highlighted when pressed
+	}
+	pauseText := "||" // Pause symbol
+	if isPaused {
+		pauseText = ">" // Play symbol
+	}
+	mc.drawButton(screen, mc.pauseButton, pauseText, pauseColor)
+
+	// Draw smaller menu button in top left
+	mc.drawButton(screen, mc.menuButton, "☰", color.RGBA{80, 80, 80, 200})
 
 	// Draw menu buttons if menu is open
 	if mc.menuOpen {
 		mc.drawButton(screen, mc.restartButton, "↻", color.RGBA{150, 100, 100, 200})
 		mc.drawButton(screen, mc.timerButton, "+10", color.RGBA{100, 150, 100, 200})
 	}
+
+	// Debug: Show button positions and current touches
+	touchIDs := ebiten.AppendTouchIDs(nil)
+	if len(touchIDs) > 0 {
+		for _, touchID := range touchIDs {
+			x, y := ebiten.TouchPosition(touchID)
+			ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Touch: %d,%d", x, y), 10, 50)
+		}
+	}
+	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("L:%d,%d R:%d,%d P:%d,%d",
+		mc.leftButton.X, mc.leftButton.Y,
+		mc.rightButton.X, mc.rightButton.Y,
+		mc.pauseButton.X, mc.pauseButton.Y), 10, 70)
+
+	// Debug: Show button press states
+	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Pressed: L:%t R:%t P:%t",
+		mc.leftPressed, mc.rightPressed, mc.pausePressed), 10, 90)
 }
 
 // drawButton draws a simple button with text

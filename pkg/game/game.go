@@ -139,7 +139,8 @@ func NewGame() *GameState {
 
 func (g *GameState) Update() error {
 	// Process mobile touch input
-	mobileInput := g.mobileControls.Update()
+	g.mobileControls.Update()
+	mobileInput := g.mobileControls.GetMobileInput()
 
 	// Handle quit key - different behavior for WASM vs standalone
 	if ebiten.IsKeyPressed(ebiten.KeyQ) {
@@ -184,6 +185,8 @@ func (g *GameState) Update() error {
 			x, y := ebiten.TouchPosition(touchID)
 			// Only unpause if touch is not on any mobile control buttons
 			if !g.mobileControls.pauseButton.Contains(x, y) &&
+				!g.mobileControls.leftButton.Contains(x, y) &&
+				!g.mobileControls.rightButton.Contains(x, y) &&
 				!g.mobileControls.menuButton.Contains(x, y) &&
 				!g.mobileControls.restartButton.Contains(x, y) &&
 				!g.mobileControls.timerButton.Contains(x, y) {
@@ -348,7 +351,7 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.timerDuration, g.elapsedTime, g.hasCrossedLine, g.secondsLate, g.speedPercentage)
 
 	// Draw mobile controls (only visible on touch devices)
-	g.mobileControls.Draw(screen)
+	g.mobileControls.Draw(screen, g.isPaused)
 
 	// Show START banner when race just started (for 3 seconds after race start)
 	if g.raceStarted && g.elapsedTime-g.timerDuration < 3*time.Second {
@@ -385,8 +388,9 @@ How to Play:
   💨 Use wind angles for optimal speed
 
 Touch Controls:
-  Left/Right sides  - Steer the boat
-  Pause button (⏸)  - Pause/Resume game
+  Left button (◀)   - Turn left
+  Right button (▶)  - Turn right
+  Center button     - Pause/Resume (shows > or ||)
   Menu button (☰)   - Show restart & timer options
 
 Dashboard Info:
