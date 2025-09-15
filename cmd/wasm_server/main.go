@@ -97,7 +97,7 @@ func createHTMLFile() error {
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Go Sailing Game</title>
+    <title>Go Sailing!</title>
     <style>
         body {
             margin: 0;
@@ -194,8 +194,8 @@ func createHTMLFile() error {
 </head>
 <body>
     <div class="header">
-        <h1><span class="wave">⛵</span> Go Sailing Game</h1>
-        <p>A realistic sailing simulation built with Go and WebAssembly</p>
+        <h1><span class="wave">⛵</span> Go Sailing!</h1>
+        <p>A sailing simulation built with Go and WebAssembly</p>
     </div>
 
     <div class="loading" id="loading">
@@ -206,28 +206,6 @@ func createHTMLFile() error {
     </div>
 
     <div class="controls" style="display: none;" id="controls">
-        <h3>🎮 Game Controls</h3>
-        <div class="control-grid">
-            <div class="control-item">
-                <span>Steer Left/Right</span>
-                <span><span class="key">←</span> <span class="key">→</span></span>
-            </div>
-            <div class="control-item">
-                <span>Pause/Resume</span>
-                <span><span class="key">SPACE</span></span>
-            </div>
-            <div class="control-item">
-                <span>Jump Timer +10s</span>
-                <span><span class="key">J</span></span>
-            </div>
-            <div class="control-item">
-                <span>Quit Game</span>
-                <span><span class="key">Q</span></span>
-            </div>
-        </div>
-        <p style="margin-top: 20px; color: #aaa; font-size: 0.9em;">
-            🏁 Start racing when the timer reaches zero! Avoid being OCS (On Course Side) at the start.
-        </p>
     </div>
 
     <div class="error" style="display: none;" id="error">
