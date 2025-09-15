@@ -24,6 +24,7 @@ type MobileControls struct {
 	// State
 	menuOpen      bool
 	lastTouchTime int
+	hasTouchInput bool // Track if we've ever seen touch input
 }
 
 // TouchZone defines a rectangular touch area
@@ -91,6 +92,11 @@ func (mc *MobileControls) Update() MobileInput {
 	// Get just pressed touches for button handling
 	justPressedTouchIDs := inpututil.AppendJustPressedTouchIDs(nil)
 
+	// Track if we've ever seen touch input (indicates mobile device)
+	if len(touchIDs) > 0 || len(justPressedTouchIDs) > 0 {
+		mc.hasTouchInput = true
+	}
+
 	// Process just pressed touches for button actions
 	for _, touchID := range justPressedTouchIDs {
 		x, y := ebiten.TouchPosition(touchID)
@@ -142,11 +148,13 @@ type MobileInput struct {
 
 // Draw renders the mobile control elements on screen
 func (mc *MobileControls) Draw(screen *ebiten.Image) {
-	// Don't draw controls if touch is not available (desktop)
-	touchIDs := ebiten.AppendTouchIDs(nil)
-	if len(touchIDs) == 0 && len(inpututil.AppendJustPressedTouchIDs(nil)) == 0 {
+	// Only draw controls if we've detected touch input (mobile device)
+	if !mc.hasTouchInput {
 		return
 	}
+
+	// Get current touches for highlighting active zones
+	touchIDs := ebiten.AppendTouchIDs(nil)
 
 	// Draw steering zones (subtle overlay when active)
 	for _, touchID := range touchIDs {

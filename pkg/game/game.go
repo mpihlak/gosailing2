@@ -9,6 +9,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/mpihlak/ebiten-sailing/pkg/dashboard"
 	"github.com/mpihlak/ebiten-sailing/pkg/game/objects"
 	"github.com/mpihlak/ebiten-sailing/pkg/game/world"
@@ -38,6 +39,8 @@ type GameState struct {
 	lastPauseInput time.Time // Last time pause key was pressed
 	// Mobile controls
 	mobileControls *MobileControls
+	// Reusable images to avoid creating new ones every frame
+	worldImage *ebiten.Image
 	// Race start timer (elapsed time based for pause support)
 	timerDuration  time.Duration // Total duration for race start (1 minute)
 	elapsedTime    time.Duration // Time elapsed since game start (only when not paused)
@@ -122,6 +125,7 @@ func NewGame() *GameState {
 		CameraX:           cameraX,
 		CameraY:           cameraY,
 		mobileControls:    NewMobileControls(ScreenWidth, ScreenHeight),
+		worldImage:        ebiten.NewImage(WorldWidth, WorldHeight),
 		isPaused:          true,            // Start game in paused mode
 		timerDuration:     1 * time.Minute, // Race starts after 1 minute
 		elapsedTime:       0,               // No time elapsed yet
@@ -310,18 +314,17 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Translate(-g.CameraX, -g.CameraY)
 
-	// Create world image to draw everything on
-	worldImage := ebiten.NewImage(WorldWidth, WorldHeight)
-	worldImage.Fill(color.RGBA{0, 105, 148, 255}) // Blue for water
+	// Clear and redraw world image (reuse existing image instead of creating new one)
+	g.worldImage.Fill(color.RGBA{0, 105, 148, 255}) // Blue for water
 
 	// Draw arena (which includes marks) to world
-	g.Arena.Draw(worldImage, g.raceStarted)
+	g.Arena.Draw(g.worldImage, g.raceStarted)
 
 	// Draw boat (which includes its history trail) to world
-	g.Boat.Draw(worldImage)
+	g.Boat.Draw(g.worldImage)
 
 	// Draw the world to screen with camera offset
-	screen.DrawImage(worldImage, op)
+	screen.DrawImage(g.worldImage, op)
 
 	// Draw dashboard directly to screen (UI always visible)
 	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.timerDuration, g.elapsedTime, g.hasCrossedLine, g.secondsLate, g.speedPercentage)
@@ -347,10 +350,8 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 
 // drawHelpScreen displays the help overlay when game is paused
 func (g *GameState) drawHelpScreen(screen *ebiten.Image) {
-	// Semi-transparent overlay
-	overlay := ebiten.NewImage(ScreenWidth, ScreenHeight)
-	overlay.Fill(color.RGBA{0, 0, 0, 180})
-	screen.DrawImage(overlay, nil)
+	// Draw semi-transparent overlay using vector instead of creating new image
+	vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, color.RGBA{0, 0, 0, 180}, false)
 
 	// Help text with platform-specific quit behavior
 	quitText := "Quit Game"
@@ -390,10 +391,8 @@ Press SPACE to continue...`, quitText)
 func (g *GameState) drawStartBanner(screen *ebiten.Image) {
 	bounds := screen.Bounds()
 
-	// Semi-transparent overlay
-	overlay := ebiten.NewImage(ScreenWidth, ScreenHeight)
-	overlay.Fill(color.RGBA{0, 0, 0, 100})
-	screen.DrawImage(overlay, nil)
+	// Semi-transparent overlay using vector drawing
+	vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, color.RGBA{0, 0, 0, 100}, false)
 
 	// START banner text
 	startText := "*** RACE START! ***"
@@ -409,10 +408,8 @@ func (g *GameState) drawStartBanner(screen *ebiten.Image) {
 func (g *GameState) drawRestartBanner(screen *ebiten.Image) {
 	bounds := screen.Bounds()
 
-	// Semi-transparent overlay
-	overlay := ebiten.NewImage(ScreenWidth, ScreenHeight)
-	overlay.Fill(color.RGBA{0, 0, 0, 100})
-	screen.DrawImage(overlay, nil)
+	// Semi-transparent overlay using vector drawing
+	vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, color.RGBA{0, 0, 0, 100}, false)
 
 	// RESTART banner text
 	restartText := "*** RESTARTED ***"
