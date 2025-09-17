@@ -205,16 +205,22 @@ func (mc *MobileControls) Draw(screen *ebiten.Image, isPaused bool) {
 	}
 	mc.drawRightArrow(screen, mc.rightButton, rightColor)
 
-	// Draw pause/play button in center
+	// Draw pause/play button in center as polygon
 	pauseColor := color.RGBA{120, 120, 120, 200}
 	if mc.pausePressed {
 		pauseColor = color.RGBA{170, 170, 170, 220} // Highlighted when pressed
 	}
-	pauseText := "||" // Pause symbol
 	if isPaused {
-		pauseText = ">" // Play symbol
+		// Game is paused - show green play triangle (pointing right)
+		playColor := color.RGBA{0, 150, 0, 200}
+		if mc.pausePressed {
+			playColor = color.RGBA{0, 200, 0, 220}
+		}
+		mc.drawPlayTriangle(screen, mc.pauseButton, playColor)
+	} else {
+		// Game is running - show pause bars (two vertical rectangles)
+		mc.drawPauseBars(screen, mc.pauseButton, pauseColor)
 	}
-	mc.drawButton(screen, mc.pauseButton, pauseText, pauseColor)
 
 	// Draw smaller menu button in top left
 	mc.drawButton(screen, mc.menuButton, "☰", color.RGBA{80, 80, 80, 200})
@@ -253,6 +259,73 @@ func (mc *MobileControls) Draw(screen *ebiten.Image, isPaused bool) {
 		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Touch in L:%t R:%t P:%t",
 			mc.leftButton.Contains(x, y), mc.rightButton.Contains(x, y), mc.pauseButton.Contains(x, y)), 10, 180)
 	}
+}
+
+// drawPlayTriangle draws a right-pointing play triangle
+func (mc *MobileControls) drawPlayTriangle(screen *ebiten.Image, zone TouchZone, fillColor color.RGBA) {
+	if !zone.Enabled {
+		return
+	}
+
+	// Calculate triangle dimensions within the button zone
+	margin := float32(zone.Width) * 0.25 // Larger margin for triangle
+	centerX := float32(zone.X + zone.Width/2)
+	centerY := float32(zone.Y + zone.Height/2)
+
+	// Triangle dimensions
+	triangleWidth := float32(zone.Width) - 2*margin
+	triangleHeight := float32(zone.Height) - 2*margin
+
+	// Triangle points (right-pointing)
+	leftX := centerX - triangleWidth/2
+	topY := centerY - triangleHeight/2
+	bottomY := centerY + triangleHeight/2
+
+	// Draw triangle using horizontal lines from center outward
+	centerLine := int(centerY)
+	halfHeight := int(triangleHeight / 2)
+
+	for i := 0; i <= halfHeight; i++ {
+		// Calculate width at this height (linear decrease from base to tip)
+		lineWidth := triangleWidth * (1 - float32(i)/float32(halfHeight))
+
+		if lineWidth > 1 {
+			// Draw line above center
+			if centerLine-i >= int(topY) {
+				vector.DrawFilledRect(screen, leftX, float32(centerLine-i), lineWidth, 1, fillColor, false)
+			}
+			// Draw line below center (skip center line to avoid double drawing)
+			if i > 0 && centerLine+i <= int(bottomY) {
+				vector.DrawFilledRect(screen, leftX, float32(centerLine+i), lineWidth, 1, fillColor, false)
+			}
+		}
+	}
+}
+
+// drawPauseBars draws two vertical bars for pause symbol
+func (mc *MobileControls) drawPauseBars(screen *ebiten.Image, zone TouchZone, fillColor color.RGBA) {
+	if !zone.Enabled {
+		return
+	}
+
+	// Calculate bar dimensions within the button zone
+	margin := float32(zone.Width) * 0.3 // Margin from button edges
+	centerX := float32(zone.X + zone.Width/2)
+	centerY := float32(zone.Y + zone.Height/2)
+
+	// Bar dimensions
+	barHeight := float32(zone.Height) - 2*margin
+	barWidth := float32(zone.Width) * 0.15  // Each bar is 15% of button width
+	barSpacing := float32(zone.Width) * 0.1 // 10% spacing between bars
+
+	// Left bar
+	leftBarX := centerX - barSpacing/2 - barWidth
+	barY := centerY - barHeight/2
+	vector.DrawFilledRect(screen, leftBarX, barY, barWidth, barHeight, fillColor, false)
+
+	// Right bar
+	rightBarX := centerX + barSpacing/2
+	vector.DrawFilledRect(screen, rightBarX, barY, barWidth, barHeight, fillColor, false)
 }
 
 // drawLeftArrow draws a left-pointing arrow polygon
