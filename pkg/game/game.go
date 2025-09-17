@@ -154,6 +154,11 @@ func (g *GameState) Update() error {
 		}
 	}
 
+	// Handle 'c' key to toggle mobile controls display for testing
+	if inpututil.IsKeyJustPressed(ebiten.KeyC) {
+		g.mobileControls.ToggleControlsOverride()
+	}
+
 	// Handle restart key (keyboard or mobile)
 	if inpututil.IsKeyJustPressed(ebiten.KeyR) || mobileInput.RestartPressed {
 		newGame := NewGame()

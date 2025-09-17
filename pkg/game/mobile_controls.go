@@ -33,6 +33,9 @@ type MobileControls struct {
 	menuOpen      bool
 	lastTouchTime int
 	hasTouchInput bool // Track if we've ever seen touch input
+
+	// Testing
+	showControlsOverride bool // Force show controls on desktop for testing
 }
 
 // TouchZone defines a rectangular touch area
@@ -107,7 +110,8 @@ func (mc *MobileControls) Update() {
 		mc.hasTouchInput = true
 	}
 
-	if !mc.hasTouchInput {
+	// Process input if touch detected OR if override enabled for testing
+	if !mc.hasTouchInput && !mc.showControlsOverride {
 		return
 	}
 
@@ -160,6 +164,11 @@ func (mc *MobileControls) GetMobileInput() MobileInput {
 	}
 }
 
+// ToggleControlsOverride toggles the display of mobile controls on desktop for testing
+func (mc *MobileControls) ToggleControlsOverride() {
+	mc.showControlsOverride = !mc.showControlsOverride
+}
+
 // updateMenuButtons toggles visibility of menu-related buttons
 func (mc *MobileControls) updateMenuButtons() {
 	mc.restartButton.Enabled = mc.menuOpen
@@ -177,24 +186,24 @@ type MobileInput struct {
 
 // Draw renders the mobile control elements on screen
 func (mc *MobileControls) Draw(screen *ebiten.Image, isPaused bool) {
-	// Only show controls if we've detected touch input (actual mobile device)
-	if !mc.hasTouchInput {
+	// Show controls if touch input detected OR if override enabled for testing
+	if !mc.hasTouchInput && !mc.showControlsOverride {
 		return
 	}
 
-	// Draw left arrow button
-	leftColor := color.RGBA{100, 100, 100, 200}
+	// Draw left arrow button as red polygon
+	leftColor := color.RGBA{200, 50, 50, 200} // Lighter red
 	if mc.leftPressed {
-		leftColor = color.RGBA{150, 150, 150, 220} // Highlighted when pressed
+		leftColor = color.RGBA{255, 80, 80, 220} // Brighter lighter red when pressed
 	}
-	mc.drawButton(screen, mc.leftButton, "◀", leftColor)
+	mc.drawLeftArrow(screen, mc.leftButton, leftColor)
 
-	// Draw right arrow button
-	rightColor := color.RGBA{100, 100, 100, 200}
+	// Draw right arrow button as green polygon
+	rightColor := color.RGBA{0, 150, 0, 200} // Green
 	if mc.rightPressed {
-		rightColor = color.RGBA{150, 150, 150, 220} // Highlighted when pressed
+		rightColor = color.RGBA{0, 200, 0, 220} // Brighter green when pressed
 	}
-	mc.drawButton(screen, mc.rightButton, "▶", rightColor)
+	mc.drawRightArrow(screen, mc.rightButton, rightColor)
 
 	// Draw pause/play button in center
 	pauseColor := color.RGBA{120, 120, 120, 200}
@@ -232,6 +241,109 @@ func (mc *MobileControls) Draw(screen *ebiten.Image, isPaused bool) {
 	// Debug: Show button press states
 	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Pressed: L:%t R:%t P:%t",
 		mc.leftPressed, mc.rightPressed, mc.pausePressed), 10, 90)
+}
+
+// drawLeftArrow draws a left-pointing arrow polygon
+func (mc *MobileControls) drawLeftArrow(screen *ebiten.Image, zone TouchZone, fillColor color.RGBA) {
+	if !zone.Enabled {
+		return
+	}
+
+	// Calculate arrow dimensions within the button zone
+	margin := float32(zone.Width) * 0.2 // Margin from button edges
+	centerX := float32(zone.X + zone.Width/2)
+	centerY := float32(zone.Y + zone.Height/2)
+	
+	// Arrow dimensions
+	arrowWidth := float32(zone.Width) - 2*margin
+	arrowHeight := float32(zone.Height) - 2*margin
+	
+	// Draw arrow as combination of rectangles
+	// Arrow shaft (horizontal rectangle)
+	shaftWidth := arrowWidth * 0.6
+	shaftHeight := arrowHeight * 0.3
+	shaftX := centerX + arrowWidth/2 - shaftWidth // Position shaft on the right for left arrow
+	shaftY := centerY - shaftHeight/2
+	
+	vector.DrawFilledRect(screen, shaftX, shaftY, shaftWidth, shaftHeight, fillColor, false)
+	
+	// Arrow head (proper triangle pointing left)
+	headEndX := shaftX // Triangle ends where shaft begins
+	headWidth := arrowWidth - shaftWidth
+	headHeight := arrowHeight
+	
+	// Draw triangle head by drawing horizontal lines from center outward
+	centerLine := int(centerY)
+	halfHeight := int(headHeight / 2)
+	
+	for i := 0; i <= halfHeight; i++ {
+		// Calculate width at this height (linear decrease from base to tip)
+		lineWidth := headWidth * (1 - float32(i)/float32(halfHeight))
+		
+		if lineWidth > 1 {
+			// For left arrow, draw from the tip position (headEndX - headWidth) forward
+			startX := headEndX - lineWidth
+			
+			// Draw line above center
+			if centerLine-i >= int(centerY-headHeight/2) {
+				vector.DrawFilledRect(screen, startX, float32(centerLine-i), lineWidth, 1, fillColor, false)
+			}
+			// Draw line below center (skip center line to avoid double drawing)
+			if i > 0 && centerLine+i <= int(centerY+headHeight/2) {
+				vector.DrawFilledRect(screen, startX, float32(centerLine+i), lineWidth, 1, fillColor, false)
+			}
+		}
+	}
+}
+
+// drawRightArrow draws a right-pointing arrow polygon
+func (mc *MobileControls) drawRightArrow(screen *ebiten.Image, zone TouchZone, fillColor color.RGBA) {
+	if !zone.Enabled {
+		return
+	}
+
+	// Calculate arrow dimensions within the button zone
+	margin := float32(zone.Width) * 0.2 // Margin from button edges
+	centerX := float32(zone.X + zone.Width/2)
+	centerY := float32(zone.Y + zone.Height/2)
+	
+	// Arrow dimensions
+	arrowWidth := float32(zone.Width) - 2*margin
+	arrowHeight := float32(zone.Height) - 2*margin
+	
+	// Draw arrow as combination of rectangles
+	// Arrow shaft (horizontal rectangle)
+	shaftWidth := arrowWidth * 0.6
+	shaftHeight := arrowHeight * 0.3
+	shaftX := centerX - arrowWidth/2
+	shaftY := centerY - shaftHeight/2
+	
+	vector.DrawFilledRect(screen, shaftX, shaftY, shaftWidth, shaftHeight, fillColor, false)
+	
+	// Arrow head (proper triangle pointing right)
+	headStartX := shaftX + shaftWidth
+	headWidth := arrowWidth - shaftWidth
+	headHeight := arrowHeight
+	
+	// Draw triangle head by drawing horizontal lines from center outward
+	centerLine := int(centerY)
+	halfHeight := int(headHeight / 2)
+	
+	for i := 0; i <= halfHeight; i++ {
+		// Calculate width at this height (linear decrease from base to tip)
+		lineWidth := headWidth * (1 - float32(i)/float32(halfHeight))
+		
+		if lineWidth > 1 {
+			// Draw line above center
+			if centerLine-i >= int(centerY-headHeight/2) {
+				vector.DrawFilledRect(screen, headStartX, float32(centerLine-i), lineWidth, 1, fillColor, false)
+			}
+			// Draw line below center (skip center line to avoid double drawing)
+			if i > 0 && centerLine+i <= int(centerY+headHeight/2) {
+				vector.DrawFilledRect(screen, headStartX, float32(centerLine+i), lineWidth, 1, fillColor, false)
+			}
+		}
+	}
 }
 
 // drawButton draws a simple button with text
