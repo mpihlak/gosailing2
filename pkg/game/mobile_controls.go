@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"image/color"
+	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -17,20 +18,16 @@ type MobileControls struct {
 	rightButton TouchZone
 	pauseButton TouchZone
 
-	// Additional UI button zones (for menu functionality)
-	menuButton    TouchZone
+	// Additional UI button zones
 	restartButton TouchZone
-	timerButton   TouchZone
 
 	// Button press states
 	leftPressed    bool
 	rightPressed   bool
 	pausePressed   bool
 	restartPressed bool
-	timerPressed   bool
 
 	// State
-	menuOpen      bool
 	lastTouchTime int
 	hasTouchInput bool // Track if we've ever seen touch input
 
@@ -69,21 +66,11 @@ func NewMobileControls(screenWidth, screenHeight int) *MobileControls {
 			Enabled: true,
 		},
 
-		// Menu button in top left corner (for additional options)
-		menuButton: TouchZone{
-			X: margin, Y: margin,
-			Width: buttonSize / 2, Height: buttonSize / 2,
-			Enabled: true,
-		},
+		// Restart button in top left corner
 		restartButton: TouchZone{
-			X: margin, Y: margin + buttonSize/2 + 10,
-			Width: buttonSize / 2, Height: buttonSize / 2,
-			Enabled: false, // Only shown when menu is open
-		},
-		timerButton: TouchZone{
-			X: margin, Y: margin + buttonSize + 20,
-			Width: buttonSize / 2, Height: buttonSize / 2,
-			Enabled: false, // Only shown when menu is open
+			X: margin, Y: margin,
+			Width: buttonSize * 2 / 3, Height: buttonSize * 2 / 3, // Slightly larger than old menu button
+			Enabled: true,
 		},
 	}
 }
@@ -102,7 +89,6 @@ func (mc *MobileControls) Update() {
 	mc.rightPressed = false
 	mc.pausePressed = false
 	mc.restartPressed = false
-	mc.timerPressed = false
 
 	// Check for any touch input to determine if this is a mobile device
 	touchIDs := ebiten.AppendTouchIDs(nil)
@@ -133,22 +119,15 @@ func (mc *MobileControls) Update() {
 	// Get just pressed touches for one-time button interactions (pause, menu, etc.)
 	justPressedTouchIDs := inpututil.AppendJustPressedTouchIDs(nil)
 
-	// Check menu and action buttons for just pressed touches
+	// Check action buttons for just pressed touches
 	for _, id := range justPressedTouchIDs {
 		x, y := ebiten.TouchPosition(id)
 
 		if mc.pauseButton.Contains(x, y) {
 			mc.pausePressed = true
 		}
-		if mc.menuButton.Contains(x, y) {
-			mc.menuOpen = !mc.menuOpen
-			mc.updateMenuButtons()
-		}
-		if mc.restartButton.Contains(x, y) && mc.restartButton.Enabled {
+		if mc.restartButton.Contains(x, y) {
 			mc.restartPressed = true
-		}
-		if mc.timerButton.Contains(x, y) && mc.timerButton.Enabled {
-			mc.timerPressed = true
 		}
 	}
 }
@@ -156,11 +135,10 @@ func (mc *MobileControls) Update() {
 // GetMobileInput returns the current mobile input state
 func (mc *MobileControls) GetMobileInput() MobileInput {
 	return MobileInput{
-		TurnLeft:         mc.leftPressed,
-		TurnRight:        mc.rightPressed,
-		PausePressed:     mc.pausePressed,
-		RestartPressed:   mc.restartButton.Enabled && mc.restartPressed,
-		TimerJumpPressed: mc.timerButton.Enabled && mc.timerPressed,
+		TurnLeft:       mc.leftPressed,
+		TurnRight:      mc.rightPressed,
+		PausePressed:   mc.pausePressed,
+		RestartPressed: mc.restartPressed,
 	}
 }
 
@@ -169,19 +147,12 @@ func (mc *MobileControls) ToggleControlsOverride() {
 	mc.showControlsOverride = !mc.showControlsOverride
 }
 
-// updateMenuButtons toggles visibility of menu-related buttons
-func (mc *MobileControls) updateMenuButtons() {
-	mc.restartButton.Enabled = mc.menuOpen
-	mc.timerButton.Enabled = mc.menuOpen
-}
-
 // MobileInput represents the current mobile input state
 type MobileInput struct {
-	TurnLeft         bool
-	TurnRight        bool
-	PausePressed     bool
-	RestartPressed   bool
-	TimerJumpPressed bool
+	TurnLeft       bool
+	TurnRight      bool
+	PausePressed   bool
+	RestartPressed bool
 }
 
 // Draw renders the mobile control elements on screen
@@ -222,14 +193,12 @@ func (mc *MobileControls) Draw(screen *ebiten.Image, isPaused bool) {
 		mc.drawPauseBars(screen, mc.pauseButton, pauseColor)
 	}
 
-	// Draw smaller menu button in top left
-	mc.drawButton(screen, mc.menuButton, "☰", color.RGBA{80, 80, 80, 200})
-
-	// Draw menu buttons if menu is open
-	if mc.menuOpen {
-		mc.drawButton(screen, mc.restartButton, "↻", color.RGBA{150, 100, 100, 200})
-		mc.drawButton(screen, mc.timerButton, "+10", color.RGBA{100, 150, 100, 200})
+	// Draw restart button in top left as curved arrow
+	restartColor := color.RGBA{80, 120, 200, 200} // Blue
+	if mc.restartPressed {
+		restartColor = color.RGBA{120, 160, 255, 220} // Brighter blue when pressed
 	}
+	mc.drawRestartArrow(screen, mc.restartButton, restartColor)
 
 	// Debug: Show button positions and current touches
 	touchIDs := ebiten.AppendTouchIDs(nil)
@@ -259,6 +228,75 @@ func (mc *MobileControls) Draw(screen *ebiten.Image, isPaused bool) {
 		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Touch in L:%t R:%t P:%t",
 			mc.leftButton.Contains(x, y), mc.rightButton.Contains(x, y), mc.pauseButton.Contains(x, y)), 10, 180)
 	}
+}
+
+// drawRestartArrow draws a curved retry arrow
+func (mc *MobileControls) drawRestartArrow(screen *ebiten.Image, zone TouchZone, fillColor color.RGBA) {
+	if !zone.Enabled {
+		return
+	}
+
+	// Calculate arrow dimensions within the button zone
+	margin := float32(zone.Width) * 0.15
+	centerX := float32(zone.X + zone.Width/2)
+	centerY := float32(zone.Y + zone.Height/2)
+
+	// Arrow dimensions
+	arrowSize := float32(zone.Width) - 2*margin
+	radius := arrowSize * 0.35
+
+	// Draw curved arrow as multiple segments
+	// We'll approximate the curve using small rectangular segments
+	strokeWidth := float32(3)
+
+	// Draw the main arc (about 240 degrees) with larger gap
+	startAngle := float32(0.8) // Start further around from right side
+	endAngle := float32(6.0)   // End earlier to create bigger gap (240 degrees)
+	steps := 30
+
+	for i := 0; i < steps; i++ {
+		angle1 := startAngle + (endAngle-startAngle)*float32(i)/float32(steps)
+		angle2 := startAngle + (endAngle-startAngle)*float32(i+1)/float32(steps)
+
+		// Calculate points on the circle
+		x1 := centerX + radius*float32(math.Cos(float64(angle1)))
+		y1 := centerY + radius*float32(math.Sin(float64(angle1)))
+		x2 := centerX + radius*float32(math.Cos(float64(angle2)))
+		y2 := centerY + radius*float32(math.Sin(float64(angle2)))
+
+		// Draw line segment
+		vector.StrokeLine(screen, x1, y1, x2, y2, strokeWidth, fillColor, false)
+	}
+
+	// Draw arrowhead at the end of the arc
+	// Calculate the end position and direction
+	endX := centerX + radius*float32(math.Cos(float64(endAngle)))
+	endY := centerY + radius*float32(math.Sin(float64(endAngle)))
+
+	// Arrowhead size
+	arrowHeadSize := arrowSize * 0.2
+
+	// Direction perpendicular to the arc (tangent direction)
+	tangentAngle := endAngle + 1.57 // Add 90 degrees for tangent
+	tangentX := float32(math.Cos(float64(tangentAngle)))
+	tangentY := float32(math.Sin(float64(tangentAngle)))
+
+	// Perpendicular direction for arrowhead width
+	perpX := -tangentY
+	perpY := tangentX
+
+	// Draw arrowhead as small filled triangle
+	headTipX := endX + tangentX*arrowHeadSize
+	headTipY := endY + tangentY*arrowHeadSize
+	headBase1X := endX + perpX*arrowHeadSize*0.5
+	headBase1Y := endY + perpY*arrowHeadSize*0.5
+	headBase2X := endX - perpX*arrowHeadSize*0.5
+	headBase2Y := endY - perpY*arrowHeadSize*0.5
+
+	// Draw arrowhead using lines
+	vector.StrokeLine(screen, headTipX, headTipY, headBase1X, headBase1Y, strokeWidth, fillColor, false)
+	vector.StrokeLine(screen, headTipX, headTipY, headBase2X, headBase2Y, strokeWidth, fillColor, false)
+	vector.StrokeLine(screen, headBase1X, headBase1Y, headBase2X, headBase2Y, strokeWidth, fillColor, false)
 }
 
 // drawPlayTriangle draws a right-pointing play triangle

@@ -170,16 +170,6 @@ func (g *GameState) Update() error {
 		return nil
 	}
 
-	// Handle timer jump key (keyboard or mobile)
-	if inpututil.IsKeyJustPressed(ebiten.KeyJ) || mobileInput.TimerJumpPressed {
-		// Jump timer forward by 10 seconds
-		g.elapsedTime += 10 * time.Second
-		// If this pushes us past race start, trigger race start
-		if !g.raceStarted && g.elapsedTime >= g.timerDuration {
-			g.raceStarted = true
-		}
-	}
-
 	// Handle pause toggle (keyboard or mobile)
 	pauseTogglePressed := inpututil.IsKeyJustPressed(ebiten.KeySpace) || mobileInput.PausePressed
 
@@ -192,9 +182,7 @@ func (g *GameState) Update() error {
 			if !g.mobileControls.pauseButton.Contains(x, y) &&
 				!g.mobileControls.leftButton.Contains(x, y) &&
 				!g.mobileControls.rightButton.Contains(x, y) &&
-				!g.mobileControls.menuButton.Contains(x, y) &&
-				!g.mobileControls.restartButton.Contains(x, y) &&
-				!g.mobileControls.timerButton.Contains(x, y) {
+				!g.mobileControls.restartButton.Contains(x, y) {
 				pauseTogglePressed = true
 				break
 			}
