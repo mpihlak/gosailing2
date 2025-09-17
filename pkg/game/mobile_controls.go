@@ -228,19 +228,31 @@ func (mc *MobileControls) Draw(screen *ebiten.Image, isPaused bool) {
 	// Debug: Show button positions and current touches
 	touchIDs := ebiten.AppendTouchIDs(nil)
 	if len(touchIDs) > 0 {
-		for _, touchID := range touchIDs {
+		for i, touchID := range touchIDs {
 			x, y := ebiten.TouchPosition(touchID)
-			ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Touch: %d,%d", x, y), 10, 50)
+			ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Touch %d: %d,%d", i, x, y), 10, 50+i*15)
 		}
 	}
 	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("L:%d,%d R:%d,%d P:%d,%d",
 		mc.leftButton.X, mc.leftButton.Y,
 		mc.rightButton.X, mc.rightButton.Y,
-		mc.pauseButton.X, mc.pauseButton.Y), 10, 70)
+		mc.pauseButton.X, mc.pauseButton.Y), 10, 120)
 
-	// Debug: Show button press states
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Pressed: L:%t R:%t P:%t",
-		mc.leftPressed, mc.rightPressed, mc.pausePressed), 10, 90)
+	// Debug: Show screen vs logical size
+	windowW, windowH := ebiten.WindowSize()
+	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Window: %dx%d Screen: %dx%d", windowW, windowH, ScreenWidth, ScreenHeight), 10, 140)
+
+	// Debug: Show button press states and touch zones
+	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Pressed: L:%t R:%t P:%t Override:%t",
+		mc.leftPressed, mc.rightPressed, mc.pausePressed, mc.showControlsOverride), 10, 160)
+
+	// Debug: Show if any touches are in button areas
+	if len(touchIDs) > 0 {
+		touchID := touchIDs[0]
+		x, y := ebiten.TouchPosition(touchID)
+		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Touch in L:%t R:%t P:%t",
+			mc.leftButton.Contains(x, y), mc.rightButton.Contains(x, y), mc.pauseButton.Contains(x, y)), 10, 180)
+	}
 }
 
 // drawLeftArrow draws a left-pointing arrow polygon
@@ -253,37 +265,37 @@ func (mc *MobileControls) drawLeftArrow(screen *ebiten.Image, zone TouchZone, fi
 	margin := float32(zone.Width) * 0.2 // Margin from button edges
 	centerX := float32(zone.X + zone.Width/2)
 	centerY := float32(zone.Y + zone.Height/2)
-	
+
 	// Arrow dimensions
 	arrowWidth := float32(zone.Width) - 2*margin
 	arrowHeight := float32(zone.Height) - 2*margin
-	
+
 	// Draw arrow as combination of rectangles
 	// Arrow shaft (horizontal rectangle)
 	shaftWidth := arrowWidth * 0.6
 	shaftHeight := arrowHeight * 0.3
 	shaftX := centerX + arrowWidth/2 - shaftWidth // Position shaft on the right for left arrow
 	shaftY := centerY - shaftHeight/2
-	
+
 	vector.DrawFilledRect(screen, shaftX, shaftY, shaftWidth, shaftHeight, fillColor, false)
-	
+
 	// Arrow head (proper triangle pointing left)
 	headEndX := shaftX // Triangle ends where shaft begins
 	headWidth := arrowWidth - shaftWidth
 	headHeight := arrowHeight
-	
+
 	// Draw triangle head by drawing horizontal lines from center outward
 	centerLine := int(centerY)
 	halfHeight := int(headHeight / 2)
-	
+
 	for i := 0; i <= halfHeight; i++ {
 		// Calculate width at this height (linear decrease from base to tip)
 		lineWidth := headWidth * (1 - float32(i)/float32(halfHeight))
-		
+
 		if lineWidth > 1 {
 			// For left arrow, draw from the tip position (headEndX - headWidth) forward
 			startX := headEndX - lineWidth
-			
+
 			// Draw line above center
 			if centerLine-i >= int(centerY-headHeight/2) {
 				vector.DrawFilledRect(screen, startX, float32(centerLine-i), lineWidth, 1, fillColor, false)
@@ -306,33 +318,33 @@ func (mc *MobileControls) drawRightArrow(screen *ebiten.Image, zone TouchZone, f
 	margin := float32(zone.Width) * 0.2 // Margin from button edges
 	centerX := float32(zone.X + zone.Width/2)
 	centerY := float32(zone.Y + zone.Height/2)
-	
+
 	// Arrow dimensions
 	arrowWidth := float32(zone.Width) - 2*margin
 	arrowHeight := float32(zone.Height) - 2*margin
-	
+
 	// Draw arrow as combination of rectangles
 	// Arrow shaft (horizontal rectangle)
 	shaftWidth := arrowWidth * 0.6
 	shaftHeight := arrowHeight * 0.3
 	shaftX := centerX - arrowWidth/2
 	shaftY := centerY - shaftHeight/2
-	
+
 	vector.DrawFilledRect(screen, shaftX, shaftY, shaftWidth, shaftHeight, fillColor, false)
-	
+
 	// Arrow head (proper triangle pointing right)
 	headStartX := shaftX + shaftWidth
 	headWidth := arrowWidth - shaftWidth
 	headHeight := arrowHeight
-	
+
 	// Draw triangle head by drawing horizontal lines from center outward
 	centerLine := int(centerY)
 	halfHeight := int(headHeight / 2)
-	
+
 	for i := 0; i <= halfHeight; i++ {
 		// Calculate width at this height (linear decrease from base to tip)
 		lineWidth := headWidth * (1 - float32(i)/float32(halfHeight))
-		
+
 		if lineWidth > 1 {
 			// Draw line above center
 			if centerLine-i >= int(centerY-headHeight/2) {
