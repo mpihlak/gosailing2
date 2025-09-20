@@ -343,6 +343,9 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	// Draw dashboard directly to screen (UI always visible)
 	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.timerDuration, g.elapsedTime, g.hasCrossedLine, g.secondsLate, g.speedPercentage)
 
+	// Draw race timer at top center (when race hasn't started)
+	g.drawRaceTimer(screen)
+
 	// Draw mobile controls (only visible on touch devices)
 	g.mobileControls.Draw(screen, g.isPaused)
 
@@ -471,6 +474,40 @@ func (g *GameState) drawRestartBanner(screen *ebiten.Image) {
 	y := bounds.Dy()/2 - 20
 
 	ebitenutil.DebugPrintAt(screen, restartText, x, y)
+}
+
+// drawRaceTimer displays the race countdown timer at the top center of the screen
+func (g *GameState) drawRaceTimer(screen *ebiten.Image) {
+	if !g.raceStarted {
+		remaining := g.timerDuration - g.elapsedTime
+		if remaining < 0 {
+			remaining = 0
+		}
+		minutes := int(remaining.Minutes())
+		// Use ceiling for seconds to avoid showing 0 when there's still time left
+		seconds := int(math.Ceil(remaining.Seconds())) % 60
+		// Special case: if we're showing 0 minutes and 0 seconds but there's still time, show 1 second
+		if minutes == 0 && seconds == 0 && remaining > 0 {
+			seconds = 1
+		}
+
+		// Create larger, more visible timer display
+		timerText := fmt.Sprintf("%02d:%02d", minutes, seconds)
+
+		// Position at top center of screen
+		bounds := screen.Bounds()
+		x := bounds.Dx()/2 - 30 // Center horizontally (approximate for timer text)
+		y := 20                 // Top of screen with some margin
+
+		// Draw timer text
+		ebitenutil.DebugPrintAt(screen, timerText, x, y)
+
+		// Add "START IN:" label above the timer
+		labelText := "START IN:"
+		labelX := bounds.Dx()/2 - 35 // Center the label
+		labelY := y - 15             // Above the timer
+		ebitenutil.DebugPrintAt(screen, labelText, labelX, labelY)
+	}
 }
 
 func (g *GameState) Layout(outsideWidth, outsideHeight int) (int, int) {

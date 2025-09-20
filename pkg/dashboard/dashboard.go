@@ -123,22 +123,8 @@ func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, tim
 
 	ebitenutil.DebugPrintAt(screen, msg, screen.Bounds().Dx()-150, 10)
 
-	// Race timer display
-	if !raceStarted {
-		remaining := timerDuration - elapsedTime
-		if remaining < 0 {
-			remaining = 0
-		}
-		minutes := int(remaining.Minutes())
-		// Use ceiling for seconds to avoid showing 0 when there's still time left
-		seconds := int(math.Ceil(remaining.Seconds())) % 60
-		// Special case: if we're showing 0 minutes and 0 seconds but there's still time, show 1 second
-		if minutes == 0 && seconds == 0 && remaining > 0 {
-			seconds = 1
-		}
-		timerMsg := fmt.Sprintf("Start: %02d:%02d", minutes, seconds)
-		ebitenutil.DebugPrintAt(screen, timerMsg, screen.Bounds().Dx()-150, 130)
-	} else {
+	// Display "RACE STARTED" at top center when race has started
+	if raceStarted {
 		// Display RACE STARTED at top center of screen
 		ebitenutil.DebugPrintAt(screen, "RACE STARTED", screen.Bounds().Dx()/2-50, 10)
 	}
