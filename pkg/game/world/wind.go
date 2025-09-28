@@ -1,6 +1,7 @@
 package world
 
 import (
+	"math"
 	"math/rand"
 	"time"
 
@@ -29,6 +30,11 @@ type VariableWind struct {
 }
 
 func (vw *VariableWind) GetWind(pos geometry.Point) (float64, float64) {
+	// Validate inputs to prevent NaN
+	if math.IsNaN(pos.X) || math.IsInf(pos.X, 0) || vw.WorldWidth <= 0 {
+		return vw.Direction, vw.LeftSpeed // Return safe fallback
+	}
+
 	// Interpolate wind speed based on X position
 	// X=0 (left) = LeftSpeed, X=WorldWidth (right) = RightSpeed
 	xRatio := pos.X / vw.WorldWidth
@@ -40,6 +46,11 @@ func (vw *VariableWind) GetWind(pos geometry.Point) (float64, float64) {
 
 	// Linear interpolation between left and right speeds
 	speed := vw.LeftSpeed + (vw.RightSpeed-vw.LeftSpeed)*xRatio
+
+	// Validate result
+	if math.IsNaN(speed) || math.IsInf(speed, 0) || speed < 0 {
+		speed = vw.LeftSpeed // Fallback to left speed
+	}
 
 	return vw.Direction, speed
 }
@@ -62,7 +73,7 @@ type OscillatingWind struct {
 }
 
 func NewOscillatingWind(leftSpeed, rightSpeed, worldWidth float64) *OscillatingWind {
-	return &OscillatingWind{
+	ow := &OscillatingWind{
 		baseWind: &VariableWind{
 			Direction:  0,
 			LeftSpeed:  leftSpeed,
@@ -75,6 +86,9 @@ func NewOscillatingWind(leftSpeed, rightSpeed, worldWidth float64) *OscillatingW
 		shiftStartTime:   time.Now(),
 		phaseStartTime:   time.Now(),
 	}
+	// Initialize first shift properly to prevent timing issues
+	ow.startNewShift(time.Now())
+	return ow
 }
 
 func (ow *OscillatingWind) Update() {

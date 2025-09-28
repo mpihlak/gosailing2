@@ -93,8 +93,20 @@ func (rp *RealisticPolar) interpolateFloat(tws float64, windSpeeds []float64, va
 	w1, w2 := windSpeeds[windIndex], windSpeeds[windIndex+1]
 	v1, v2 := values[windIndex], values[windIndex+1]
 
+	// Prevent division by zero
+	if w2 == w1 {
+		return v1
+	}
+
 	factor := (tws - w1) / (w2 - w1)
-	return v1 + (v2-v1)*factor
+	result := v1 + (v2-v1)*factor
+
+	// Validate result to prevent NaN propagation
+	if math.IsNaN(result) || math.IsInf(result, 0) || result < 0 {
+		return v1 // Return safe fallback value
+	}
+
+	return result
 }
 
 // Helper function to get speed at a specific angle
@@ -134,6 +146,18 @@ func (rp *RealisticPolar) interpolateAngle(twa float64, angles, speeds []float64
 	a1, a2 := angles[angleIndex], angles[angleIndex+1]
 	s1, s2 := speeds[angleIndex], speeds[angleIndex+1]
 
+	// Prevent division by zero
+	if a2 == a1 {
+		return s1
+	}
+
 	factor := (twa - a1) / (a2 - a1)
-	return s1 + (s2-s1)*factor
+	result := s1 + (s2-s1)*factor
+
+	// Validate result to prevent NaN propagation
+	if math.IsNaN(result) || math.IsInf(result, 0) || result < 0 {
+		return s1 // Return safe fallback value
+	}
+
+	return result
 }

@@ -48,6 +48,14 @@ func (b *Boat) Update() {
 	// Get wind conditions at boat position
 	windDir, windSpeed := b.Wind.GetWind(b.Pos)
 
+	// Validate wind values to prevent NaN propagation
+	if math.IsNaN(windDir) || math.IsInf(windDir, 0) {
+		windDir = 0.0 // Default to North
+	}
+	if math.IsNaN(windSpeed) || math.IsInf(windSpeed, 0) || windSpeed < 0 {
+		windSpeed = 10.0 // Default to 10 knots
+	}
+
 	// Calculate True Wind Angle (TWA)
 	twa := b.Heading - windDir
 	if twa < -180 {
@@ -58,6 +66,10 @@ func (b *Boat) Update() {
 
 	// Get target speed from polars
 	targetSpeed := b.Polars.GetBoatSpeed(twa, windSpeed)
+	// Validate target speed
+	if math.IsNaN(targetSpeed) || math.IsInf(targetSpeed, 0) || targetSpeed < 0 {
+		targetSpeed = 0.0
+	}
 
 	// Convert target speed to target velocity in heading direction
 	headingRad := b.Heading * math.Pi / 180
@@ -110,6 +122,12 @@ func (b *Boat) Update() {
 
 	// Calculate actual current speed in knots for dashboard display
 	currentPixelSpeed := math.Sqrt(b.VelX*b.VelX + b.VelY*b.VelY)
+	// Validate calculated speed to prevent NaN propagation
+	if math.IsNaN(currentPixelSpeed) || math.IsInf(currentPixelSpeed, 0) {
+		currentPixelSpeed = 0.0
+		b.VelX = 0.0
+		b.VelY = 0.0
+	}
 	b.Speed = currentPixelSpeed * 60.0 / speedScale // Convert back to knots
 
 	// Add to history

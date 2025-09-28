@@ -33,7 +33,11 @@ func (d *Dashboard) CalculateDistanceToLine() float64 {
 	C := d.LineEnd.X*d.LineStart.Y - d.LineStart.X*d.LineEnd.Y
 
 	// Calculate signed distance (without absolute value)
-	signedDistance := (A*bowPos.X + B*bowPos.Y + C) / math.Sqrt(A*A+B*B)
+	denominator := math.Sqrt(A*A + B*B)
+	if denominator == 0 {
+		return 0 // Degenerate line case
+	}
+	signedDistance := (A*bowPos.X + B*bowPos.Y + C) / denominator
 
 	// For a horizontal line (A=0), the sign indicates which side:
 	// Since the starting line is horizontal and course is above (lower Y),
@@ -54,7 +58,12 @@ func (d *Dashboard) CalculateVMG() float64 {
 
 	// VMG = Speed * cos(TWA)
 	twaRad := twa * math.Pi / 180
-	return d.Boat.Speed * math.Cos(twaRad)
+	vmg := d.Boat.Speed * math.Cos(twaRad)
+	// Validate VMG to prevent NaN
+	if math.IsNaN(vmg) || math.IsInf(vmg, 0) {
+		return 0.0
+	}
+	return vmg
 }
 
 // FindBestVMG finds the best VMG achievable for current sailing mode (beat or run)

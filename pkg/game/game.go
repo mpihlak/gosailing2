@@ -485,6 +485,7 @@ Controls:
   Space           - Pause/Resume
   J               - Jump Timer +10 sec (pre start)
   R               - Restart Game
+  C               - Toggle Touch Controls (testing)
   Q               - %s
 
 Press SPACE to continue...`, quitText)

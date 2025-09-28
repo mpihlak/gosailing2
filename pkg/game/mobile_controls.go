@@ -89,8 +89,8 @@ func (mc *MobileControls) detectTouchCapability() {
 		return
 	}
 
-	// For desktop applications, default to no touch input
-	// This will be updated if touch input is detected later
+	// Start with no touch input detected
+	// This will be updated dynamically during Update() when touch is first detected
 	mc.hasTouchInput = false
 }
 
@@ -109,10 +109,11 @@ func (mc *MobileControls) Update() {
 	mc.pausePressed = false
 	mc.restartPressed = false
 
-	// Update touch capability detection if touch input is detected
-	// This handles cases where initial detection was conservative
+	// Dynamically detect touch input during runtime
+	// Check both current touches and just-pressed touches
 	touchIDs := ebiten.AppendTouchIDs(nil)
-	if len(touchIDs) > 0 && !mc.hasTouchInput {
+	justPressed := inpututil.AppendJustPressedTouchIDs(nil)
+	if len(touchIDs) > 0 || len(justPressed) > 0 {
 		mc.hasTouchInput = true
 	}
 
@@ -122,7 +123,7 @@ func (mc *MobileControls) Update() {
 	}
 
 	// Get all current touches (including held touches)
-	currentTouchIDs := ebiten.AppendTouchIDs(nil)
+	currentTouchIDs := touchIDs
 
 	// Check each button for current touches (held down)
 	for _, id := range currentTouchIDs {
