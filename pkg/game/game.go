@@ -449,7 +449,7 @@ func (g *GameState) drawHelpScreen(screen *ebiten.Image) {
 	// Check if we're on mobile (touch input detected)
 	if g.mobileControls.hasTouchInput {
 		// Mobile help text - focus on game explanation, not controls
-		helpText = `SAILING GAME - PAUSED
+		helpText = `Go Sailing! - PAUSED
 
 How to Play:
 * Start racing when the timer reaches zero
@@ -459,11 +459,7 @@ How to Play:
 * Return and cross finish line to complete race
 * Use wind angles for optimal speed
 
-Touch Controls:
-  Left button (◀)   - Turn left
-  Right button (▶)  - Turn right
-  Center button     - Pause/Resume (shows > or ||)
-  Menu button (☰)   - Show restart & timer options
+Use Touch Controls to turn left/right, pause or restart.
 
 Tap anywhere to continue...`
 	} else {
