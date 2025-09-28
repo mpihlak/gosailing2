@@ -92,14 +92,15 @@ func (a *Arena) drawWindBarb(screen *ebiten.Image, x, y float64, windDir, windSp
 	shaftLength := 20.0
 
 	// Convert wind direction to radians (wind direction is where wind comes FROM)
-	// Wind barbs point in the direction wind is blowing TO, so add 180°
-	// For wind from North (0°), barb should point South (downward in screen coords)
-	// In screen coordinates: positive Y is down, so we don't need the negative sign
-	dirRad := (windDir + 180.0) * math.Pi / 180.0
+	// Wind barb shaft points FROM wind direction, with barbs/flags at the tail (wind source)
+	// For TWD 355° (wind from 5° west of north), shaft points from 355° toward 175°
+	// In screen coordinates: 0° = up, 90° = right, 180° = down, 270° = left
+	// We need to correct for screen coordinate system where Y+ is down
+	dirRad := windDir * math.Pi / 180.0
 
-	// Calculate shaft end point
-	shaftEndX := x + shaftLength*math.Sin(dirRad)
-	shaftEndY := y + shaftLength*math.Cos(dirRad)
+	// Calculate shaft end point - shaft points in direction wind is blowing TO
+	shaftEndX := x + shaftLength*math.Sin(dirRad+math.Pi)
+	shaftEndY := y - shaftLength*math.Cos(dirRad+math.Pi)
 
 	// Draw main shaft
 	ebitenutil.DrawLine(screen, x, y, shaftEndX, shaftEndY, windColor)
@@ -111,35 +112,35 @@ func (a *Arena) drawWindBarb(screen *ebiten.Image, x, y float64, windDir, windSp
 
 	// Barb length and perpendicular angle
 	barbLength := 8.0
-	perpAngle := dirRad + math.Pi/2 // Perpendicular to shaft
+	perpAngle := (dirRad + math.Pi) + math.Pi/2 // Perpendicular to shaft direction
 
 	// Draw full barbs (every 10 knots)
 	for i := 0; i < fullBarbs && i < 5; i++ { // Limit to 5 barbs to keep it clean
-		// Position along shaft (starting from end, moving back)
-		barbPos := 0.8 - float64(i)*0.15
-		if barbPos < 0.2 {
-			barbPos = 0.2
+		// Position along shaft (starting from base, moving toward end)
+		barbPos := 0.2 + float64(i)*0.15
+		if barbPos > 0.8 {
+			barbPos = 0.8
 		}
 
-		barbStartX := x + barbPos*shaftLength*math.Sin(dirRad)
-		barbStartY := y + barbPos*shaftLength*math.Cos(dirRad)
+		barbStartX := x + barbPos*shaftLength*math.Sin(dirRad+math.Pi)
+		barbStartY := y - barbPos*shaftLength*math.Cos(dirRad+math.Pi)
 		barbEndX := barbStartX + barbLength*math.Sin(perpAngle)
-		barbEndY := barbStartY + barbLength*math.Cos(perpAngle)
+		barbEndY := barbStartY - barbLength*math.Cos(perpAngle)
 
 		ebitenutil.DrawLine(screen, barbStartX, barbStartY, barbEndX, barbEndY, windColor)
 	}
 
 	// Draw half barb if needed (5 knots)
 	if halfBarb {
-		barbPos := 0.8 - float64(fullBarbs)*0.15
-		if barbPos < 0.2 {
-			barbPos = 0.2
+		barbPos := 0.2 + float64(fullBarbs)*0.15
+		if barbPos > 0.8 {
+			barbPos = 0.8
 		}
 
-		barbStartX := x + barbPos*shaftLength*math.Sin(dirRad)
-		barbStartY := y + barbPos*shaftLength*math.Cos(dirRad)
+		barbStartX := x + barbPos*shaftLength*math.Sin(dirRad+math.Pi)
+		barbStartY := y - barbPos*shaftLength*math.Cos(dirRad+math.Pi)
 		barbEndX := barbStartX + (barbLength*0.5)*math.Sin(perpAngle)
-		barbEndY := barbStartY + (barbLength*0.5)*math.Cos(perpAngle)
+		barbEndY := barbStartY - (barbLength*0.5)*math.Cos(perpAngle)
 
 		ebitenutil.DrawLine(screen, barbStartX, barbStartY, barbEndX, barbEndY, windColor)
 	}

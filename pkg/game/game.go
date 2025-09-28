@@ -462,15 +462,6 @@ Touch Controls:
   Center button     - Pause/Resume (shows > or ||)
   Menu button (☰)   - Show restart & timer options
 
-Dashboard Info:
-  Speed     - Current boat speed in knots
-  Heading   - Boat direction (0-360°)
-  TWA       - True Wind Angle (-180 to +180°)
-  TWS       - True Wind Speed in knots
-  VMG       - Velocity Made Good (speed toward wind)
-  Target VMG - Best achievable VMG for conditions
-  Dist to Line - Distance to starting line
-
 Tap anywhere to continue...`
 	} else {
 		// Desktop help text - include keyboard shortcuts
@@ -496,15 +487,6 @@ Controls:
   J               - Jump Timer +10 sec
   R               - Restart Game
   Q               - %s
-
-Dashboard Info:
-  Speed     - Current boat speed in knots
-  Heading   - Boat direction (0-360°)
-  TWA       - True Wind Angle (-180 to +180°)
-  TWS       - True Wind Speed in knots
-  VMG       - Velocity Made Good (speed toward wind)
-  Target VMG - Best achievable VMG for conditions
-  Dist to Line - Distance to starting line
 
 Press SPACE to continue...`, quitText)
 	}

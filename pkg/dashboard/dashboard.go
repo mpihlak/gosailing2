@@ -134,8 +134,8 @@ func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, tim
 
 	// Base dashboard message
 	msg := fmt.Sprintf(
-		"Speed: %.1f kts\nHeading: %.0f°\nTWA: %.0f°\nTWS: %.1f kts\nDist to Line: %.0fm\nVMG: %.1f kts\nTarget VMG: %.1f kts\nUpwind Brg: %.0f°",
-		d.Boat.Speed, d.Boat.Heading, twa, windSpeed, distanceToLine, currentVMG, targetVMG, bearingToUpwind,
+		"Speed: %.1f kts\nHeading: %.0f°\nTWA: %.0f°\nTWD: %.0f°\nTWS: %.1f kts\nDist to Line: %.0fm\nVMG: %.1f kts\nTarget VMG: %.1f kts\nUpwind Brg: %.0f°",
+		d.Boat.Speed, d.Boat.Heading, twa, windDir, windSpeed, distanceToLine, currentVMG, targetVMG, bearingToUpwind,
 	)
 
 	// Add line crossing information if boat has crossed
