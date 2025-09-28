@@ -46,6 +46,7 @@ type GameState struct {
 	elapsedTime    time.Duration // Time elapsed since game start (only when not paused)
 	lastUpdateTime time.Time     // Last time Update was called (for calculating delta)
 	raceStarted    bool          // Whether the race has started
+	raceTimer      time.Duration // Time since race started (counts up from 0)
 	// OCS detection
 	isOCS bool // Whether boat is On Course Side
 	// Line crossing tracking
@@ -139,6 +140,7 @@ func NewGame() *GameState {
 		elapsedTime:       0,               // No time elapsed yet
 		lastUpdateTime:    time.Now(),      // Initialize update time
 		raceStarted:       false,
+		raceTimer:         0, // Race timer starts at 0
 		isOCS:             false,
 		showRestartBanner: false,
 		restartBannerTime: time.Time{},
@@ -176,6 +178,15 @@ func (g *GameState) Update() error {
 		g.showRestartBanner = true
 		g.restartBannerTime = time.Now()
 		return nil
+	}
+
+	// Handle 'J' key to jump timer forward by 10 seconds (only before race starts)
+	if inpututil.IsKeyJustPressed(ebiten.KeyJ) && !g.raceStarted {
+		g.elapsedTime += 10 * time.Second
+		// Make sure we don't go past the timer duration
+		if g.elapsedTime > g.timerDuration {
+			g.elapsedTime = g.timerDuration
+		}
 	}
 
 	// Handle pause toggle (keyboard or mobile)
@@ -224,6 +235,12 @@ func (g *GameState) Update() error {
 	// Check race start timer based on elapsed time
 	if !g.raceStarted && g.elapsedTime >= g.timerDuration {
 		g.raceStarted = true
+		g.raceTimer = 0 // Initialize race timer when race starts
+	}
+
+	// Update race timer if race has started
+	if g.raceStarted {
+		g.raceTimer += deltaTime
 	}
 
 	// OCS detection - check if boat is above (course side of) the starting line
@@ -484,9 +501,13 @@ func (g *GameState) drawRestartBanner(screen *ebiten.Image) {
 	ebitenutil.DebugPrintAt(screen, restartText, x, y)
 }
 
-// drawRaceTimer displays the race countdown timer at the top center of the screen
+// drawRaceTimer displays the race countdown timer or race time at the top center of the screen
 func (g *GameState) drawRaceTimer(screen *ebiten.Image) {
+	bounds := screen.Bounds()
+	y := 20 // Top of screen with some margin
+
 	if !g.raceStarted {
+		// Show countdown timer before race starts
 		remaining := g.timerDuration - g.elapsedTime
 		if remaining < 0 {
 			remaining = 0
@@ -503,9 +524,7 @@ func (g *GameState) drawRaceTimer(screen *ebiten.Image) {
 		timerText := fmt.Sprintf("%02d:%02d", minutes, seconds)
 
 		// Position at top center of screen
-		bounds := screen.Bounds()
 		x := bounds.Dx()/2 - 30 // Center horizontally (approximate for timer text)
-		y := 20                 // Top of screen with some margin
 
 		// Draw timer text
 		ebitenutil.DebugPrintAt(screen, timerText, x, y)
@@ -513,6 +532,25 @@ func (g *GameState) drawRaceTimer(screen *ebiten.Image) {
 		// Add "START IN:" label above the timer
 		labelText := "START IN:"
 		labelX := bounds.Dx()/2 - 35 // Center the label
+		labelY := y - 15             // Above the timer
+		ebitenutil.DebugPrintAt(screen, labelText, labelX, labelY)
+	} else {
+		// Show race timer after race starts
+		minutes := int(g.raceTimer.Minutes())
+		seconds := int(g.raceTimer.Seconds()) % 60
+
+		// Create race timer display
+		timerText := fmt.Sprintf("%02d:%02d", minutes, seconds)
+
+		// Position at top center of screen
+		x := bounds.Dx()/2 - 30 // Center horizontally (approximate for timer text)
+
+		// Draw timer text
+		ebitenutil.DebugPrintAt(screen, timerText, x, y)
+
+		// Add "RACE TIME:" label above the timer
+		labelText := "RACE TIME:"
+		labelX := bounds.Dx()/2 - 42 // Center the label (slightly wider than "START IN:")
 		labelY := y - 15             // Above the timer
 		ebitenutil.DebugPrintAt(screen, labelText, labelX, labelY)
 	}
