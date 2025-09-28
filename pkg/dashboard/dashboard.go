@@ -2,7 +2,6 @@ package dashboard
 
 import (
 	"fmt"
-	"image/color"
 	"math"
 	"time"
 
@@ -58,26 +57,6 @@ func (d *Dashboard) CalculateVMG() float64 {
 	return d.Boat.Speed * math.Cos(twaRad)
 }
 
-// CalculateBearingToUpwindMark calculates bearing from boat to upwind mark in degrees
-func (d *Dashboard) CalculateBearingToUpwindMark() float64 {
-	// Calculate delta X and Y from boat to upwind mark
-	dx := d.UpwindMark.X - d.Boat.Pos.X
-	dy := d.UpwindMark.Y - d.Boat.Pos.Y
-
-	// Calculate bearing in radians (atan2 gives angle from positive X-axis)
-	bearingRad := math.Atan2(dx, -dy) // -dy because Y is inverted in screen coordinates
-
-	// Convert to degrees
-	bearingDeg := bearingRad * 180 / math.Pi
-
-	// Normalize to 0-360 range
-	if bearingDeg < 0 {
-		bearingDeg += 360
-	}
-
-	return bearingDeg
-}
-
 // FindBestVMG finds the best VMG achievable for current sailing mode (beat or run)
 func (d *Dashboard) FindBestVMG() float64 {
 	windDir, windSpeed := d.Wind.GetWind(d.Boat.Pos)
@@ -130,12 +109,11 @@ func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, tim
 	distanceToLine := d.CalculateDistanceToLine()
 	currentVMG := d.CalculateVMG()
 	targetVMG := d.FindBestVMG()
-	bearingToUpwind := d.CalculateBearingToUpwindMark()
 
 	// Base dashboard message
 	msg := fmt.Sprintf(
-		"Speed: %.1f kts\nHeading: %.0f°\nTWA: %.0f°\nTWD: %.0f°\nTWS: %.1f kts\nDist to Line: %.0fm\nVMG: %.1f kts\nTarget VMG: %.1f kts\nUpwind Brg: %.0f°",
-		d.Boat.Speed, d.Boat.Heading, twa, windDir, windSpeed, distanceToLine, currentVMG, targetVMG, bearingToUpwind,
+		"Speed: %.1f kts\nHeading: %.0f°\nTWA: %.0f°\nTWD: %.0f°\nTWS: %.1f kts\nDist to Line: %.0fm\nVMG: %.1f kts\nTarget VMG: %.1f kts",
+		d.Boat.Speed, d.Boat.Heading, twa, windDir, windSpeed, distanceToLine, currentVMG, targetVMG,
 	)
 
 	// Add line crossing information if boat has crossed
@@ -157,25 +135,4 @@ func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, tim
 	}
 
 	ebitenutil.DebugPrintAt(screen, msg, screen.Bounds().Dx()-150, 10)
-
-	// OCS warning - show during pre-start or if boat was OCS when race started
-	if isOCS {
-		// Display OCS warning at top center of screen
-		ocsY := 10                          // At top of screen
-		ocsX := screen.Bounds().Dx()/2 - 40 // Center horizontally
-		ocsWidth := 80
-		ocsHeight := 15
-
-		// Create red rectangle
-		redRect := ebiten.NewImage(ocsWidth, ocsHeight)
-		redRect.Fill(color.RGBA{255, 0, 0, 255}) // Red background
-
-		// Draw red rectangle
-		op := &ebiten.DrawImageOptions{}
-		op.GeoM.Translate(float64(ocsX), float64(ocsY))
-		screen.DrawImage(redRect, op)
-
-		// Draw white text on red background
-		ebitenutil.DebugPrintAt(screen, "*** OCS ***", ocsX, ocsY)
-	}
 }

@@ -412,6 +412,9 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	// Draw race timer at top center (when race hasn't started)
 	g.drawRaceTimer(screen)
 
+	// Draw OCS warning below timer
+	g.drawOCSWarning(screen)
+
 	// Draw mobile controls (only visible on touch devices)
 	g.mobileControls.Draw(screen, g.isPaused)
 
@@ -449,12 +452,12 @@ func (g *GameState) drawHelpScreen(screen *ebiten.Image) {
 		helpText = `SAILING GAME - PAUSED
 
 How to Play:
-  🎯 Start racing when the timer reaches zero
-  ⚠️  Avoid being OCS (On Course Side) at start
-  🏁 Cross the starting line after race begins
-  ⛵ Sail upwind and round the mark (leave to port)
-  🏆 Return and cross finish line to complete race
-  💨 Use wind angles for optimal speed
+* Start racing when the timer reaches zero
+* Avoid being OCS (On Course Side) at start
+* Cross the starting line after race begins
+* Sail upwind and round the mark (leave to port)
+* Return and cross finish line to complete race
+* Use wind angles for optimal speed
 
 Touch Controls:
   Left button (◀)   - Turn left
@@ -473,18 +476,18 @@ Tap anywhere to continue...`
 		helpText = fmt.Sprintf(`SAILING GAME - PAUSED
 
 How to Play:
-  🎯 Start racing when the timer reaches zero
-  ⚠️  Avoid being OCS (On Course Side) at start
-  🏁 Cross the starting line after race begins
-  ⛵ Sail upwind and round the mark (leave to port)
-  🏆 Return and cross finish line to complete race
-  💨 Use wind angles for optimal speed
+* Start racing when the timer reaches zero
+* Avoid being OCS (On Course Side) at start
+* Cross the starting line after race begins
+* Sail upwind and round the mark (leave to port)
+* Return and cross finish line to complete race
+* Use wind angles for optimal speed
 
 Controls:
   Left Arrow / A  - Turn Left
   Right Arrow / D - Turn Right
   Space           - Pause/Resume
-  J               - Jump Timer +10 sec
+  J               - Jump Timer +10 sec (pre start)
   R               - Restart Game
   Q               - %s
 
@@ -586,6 +589,33 @@ func (g *GameState) drawRaceTimer(screen *ebiten.Image) {
 		labelY := y - 15             // Above the timer
 		ebitenutil.DebugPrintAt(screen, labelText, labelX, labelY)
 	}
+}
+
+// drawOCSWarning displays the OCS warning below the race timer
+func (g *GameState) drawOCSWarning(screen *ebiten.Image) {
+	// Only show OCS warning when boat is OCS
+	if !g.isOCS {
+		return
+	}
+
+	bounds := screen.Bounds()
+	// Position below the timer (timer is at Y=20, so position OCS at Y=50)
+	ocsY := 50
+	ocsX := bounds.Dx()/2 - 40 // Center horizontally
+	ocsWidth := 80
+	ocsHeight := 15
+
+	// Create red rectangle
+	redRect := ebiten.NewImage(ocsWidth, ocsHeight)
+	redRect.Fill(color.RGBA{255, 0, 0, 255}) // Red background
+
+	// Draw red rectangle
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Translate(float64(ocsX), float64(ocsY))
+	screen.DrawImage(redRect, op)
+
+	// Draw white text on red background
+	ebitenutil.DebugPrintAt(screen, "*** OCS ***", ocsX, ocsY)
 }
 
 // updateMarkRounding tracks the three phases of mark rounding
