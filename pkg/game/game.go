@@ -71,12 +71,11 @@ type GameState struct {
 }
 
 func NewGame() *GameState {
-	wind := &world.VariableWind{
-		Direction:  0,          // From North
-		LeftSpeed:  14,         // 14 kts on left side
-		RightSpeed: 8,          // 8 kts on right side
-		WorldWidth: WorldWidth, // Use world width for interpolation
-	}
+	wind := world.NewOscillatingWind(
+		14,         // 14 kts on left side
+		8,          // 8 kts on right side
+		WorldWidth, // Use world width for interpolation
+	)
 
 	// Position starting line in center of world, optimized for 720p view
 	// Starting line at Y = 2400, shorter line (400m instead of 600m)
@@ -241,6 +240,11 @@ func (g *GameState) Update() error {
 	// Don't update game logic when paused
 	if g.isPaused {
 		return nil
+	}
+
+	// Update wind oscillations (only when not paused)
+	if oscillatingWind, ok := g.Wind.(*world.OscillatingWind); ok {
+		oscillatingWind.Update()
 	}
 
 	// Update elapsed time (only when not paused)
