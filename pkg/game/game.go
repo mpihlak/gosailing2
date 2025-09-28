@@ -392,7 +392,7 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	g.worldImage.Fill(color.RGBA{0, 105, 148, 255}) // Blue for water
 
 	// Draw arena (which includes marks) to world
-	g.Arena.Draw(g.worldImage, g.raceStarted)
+	g.Arena.Draw(g.worldImage, g.raceStarted, g.Wind)
 
 	// Draw boat (which includes its history trail) to world
 	g.Boat.Draw(g.worldImage)

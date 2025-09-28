@@ -83,6 +83,68 @@ func (a *Arena) drawDottedLine(screen *ebiten.Image, x1, y1, x2, y2 float64, lin
 	}
 }
 
+// drawWindBarb draws a wind barb at the specified position showing wind direction and strength
+func (a *Arena) drawWindBarb(screen *ebiten.Image, x, y float64, windDir, windSpeed float64) {
+	// Light gray color as requested
+	windColor := color.RGBA{192, 192, 192, 255}
+
+	// Wind barb shaft length (main line showing direction)
+	shaftLength := 20.0
+
+	// Convert wind direction to radians (wind direction is where wind comes FROM)
+	// Wind barbs point in the direction wind is blowing TO, so add 180°
+	// For wind from North (0°), barb should point South (downward in screen coords)
+	// In screen coordinates: positive Y is down, so we don't need the negative sign
+	dirRad := (windDir + 180.0) * math.Pi / 180.0
+
+	// Calculate shaft end point
+	shaftEndX := x + shaftLength*math.Sin(dirRad)
+	shaftEndY := y + shaftLength*math.Cos(dirRad)
+
+	// Draw main shaft
+	ebitenutil.DrawLine(screen, x, y, shaftEndX, shaftEndY, windColor)
+
+	// Draw wind speed indicators (barbs/flags)
+	// Each full barb represents 10 knots, half barbs represent 5 knots
+	fullBarbs := int(windSpeed / 10)
+	halfBarb := (int(windSpeed) % 10) >= 5
+
+	// Barb length and perpendicular angle
+	barbLength := 8.0
+	perpAngle := dirRad + math.Pi/2 // Perpendicular to shaft
+
+	// Draw full barbs (every 10 knots)
+	for i := 0; i < fullBarbs && i < 5; i++ { // Limit to 5 barbs to keep it clean
+		// Position along shaft (starting from end, moving back)
+		barbPos := 0.8 - float64(i)*0.15
+		if barbPos < 0.2 {
+			barbPos = 0.2
+		}
+
+		barbStartX := x + barbPos*shaftLength*math.Sin(dirRad)
+		barbStartY := y + barbPos*shaftLength*math.Cos(dirRad)
+		barbEndX := barbStartX + barbLength*math.Sin(perpAngle)
+		barbEndY := barbStartY + barbLength*math.Cos(perpAngle)
+
+		ebitenutil.DrawLine(screen, barbStartX, barbStartY, barbEndX, barbEndY, windColor)
+	}
+
+	// Draw half barb if needed (5 knots)
+	if halfBarb {
+		barbPos := 0.8 - float64(fullBarbs)*0.15
+		if barbPos < 0.2 {
+			barbPos = 0.2
+		}
+
+		barbStartX := x + barbPos*shaftLength*math.Sin(dirRad)
+		barbStartY := y + barbPos*shaftLength*math.Cos(dirRad)
+		barbEndX := barbStartX + (barbLength*0.5)*math.Sin(perpAngle)
+		barbEndY := barbStartY + (barbLength*0.5)*math.Cos(perpAngle)
+
+		ebitenutil.DrawLine(screen, barbStartX, barbStartY, barbEndX, barbEndY, windColor)
+	}
+}
+
 // drawLaylines draws the starboard and port laylines for the upwind mark
 func (a *Arena) drawLaylines(screen *ebiten.Image) {
 	// Find upwind mark (third mark in the array)
@@ -116,7 +178,36 @@ func (a *Arena) drawLaylines(screen *ebiten.Image) {
 	a.drawDottedLine(screen, upwindMark.Pos.X, upwindMark.Pos.Y, portEndX, portEndY, laylineColor)
 }
 
-func (a *Arena) Draw(screen *ebiten.Image, raceStarted bool) {
+// drawWindIndicators draws wind barbs across the course at regular intervals
+func (a *Arena) drawWindIndicators(screen *ebiten.Image, wind Wind) {
+	// Grid spacing - every 150 pixels as requested
+	gridSpacing := 150.0
+
+	// Get screen bounds to know the area we need to cover
+	bounds := screen.Bounds()
+	startX := 0.0
+	startY := 0.0
+	endX := float64(bounds.Max.X)
+	endY := float64(bounds.Max.Y)
+
+	// Draw wind barbs at grid points
+	for x := startX; x <= endX; x += gridSpacing {
+		for y := startY; y <= endY; y += gridSpacing {
+			// Get wind at this position
+			windDir, windSpeed := wind.GetWind(geometry.Point{X: x, Y: y})
+
+			// Draw wind barb at this grid point
+			a.drawWindBarb(screen, x, y, windDir, windSpeed)
+		}
+	}
+}
+
+func (a *Arena) Draw(screen *ebiten.Image, raceStarted bool, wind Wind) {
+	// Draw wind indicators first (in background)
+	if wind != nil {
+		a.drawWindIndicators(screen, wind)
+	}
+
 	// Draw starting line if we have exactly 2 marks (Pin and Committee)
 	if len(a.Marks) == 2 {
 		pin := a.Marks[0]
