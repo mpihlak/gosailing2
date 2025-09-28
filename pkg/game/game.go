@@ -71,9 +71,11 @@ type GameState struct {
 }
 
 func NewGame() *GameState {
-	wind := &world.ConstantWind{
-		Direction: 0, // From North
-		Speed:     10,
+	wind := &world.VariableWind{
+		Direction:  0,          // From North
+		LeftSpeed:  14,         // 14 kts on left side
+		RightSpeed: 8,          // 8 kts on right side
+		WorldWidth: WorldWidth, // Use world width for interpolation
 	}
 
 	// Position starting line in center of world, optimized for 720p view
