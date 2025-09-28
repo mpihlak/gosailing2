@@ -83,6 +83,39 @@ func (a *Arena) drawDottedLine(screen *ebiten.Image, x1, y1, x2, y2 float64, lin
 	}
 }
 
+// drawLaylines draws the starboard and port laylines for the upwind mark
+func (a *Arena) drawLaylines(screen *ebiten.Image) {
+	// Find upwind mark (third mark in the array)
+	if len(a.Marks) < 3 {
+		return
+	}
+	upwindMark := a.Marks[2]
+
+	// Wind is from North (0 degrees), laylines show the close-hauled approach paths to the mark
+	// Since positive Y is down (toward starting line), we want laylines extending in positive Y direction
+	// Starboard tack: boats sail at 45° to wind (northeast), layline extends southwest from mark
+	// Port tack: boats sail at -45° to wind (northwest), layline extends southeast from mark
+
+	laylineColor := color.RGBA{128, 128, 128, 100} // Light gray with transparency
+
+	// Calculate layline length (extend toward starting line)
+	laylineLength := 1500.0
+
+	// Starboard layline: extends southwest from mark (225°)
+	starboardAngle := 225.0 * math.Pi / 180
+	starboardEndX := upwindMark.Pos.X + laylineLength*math.Sin(starboardAngle)
+	starboardEndY := upwindMark.Pos.Y - laylineLength*math.Cos(starboardAngle) // Negative cos(225°) makes this positive Y
+
+	// Port layline: extends southeast from mark (135°)
+	portAngle := 135.0 * math.Pi / 180
+	portEndX := upwindMark.Pos.X + laylineLength*math.Sin(portAngle)
+	portEndY := upwindMark.Pos.Y - laylineLength*math.Cos(portAngle) // Negative cos(135°) makes this positive Y
+
+	// Draw both laylines as dotted lines (extending toward starting line)
+	a.drawDottedLine(screen, upwindMark.Pos.X, upwindMark.Pos.Y, starboardEndX, starboardEndY, laylineColor)
+	a.drawDottedLine(screen, upwindMark.Pos.X, upwindMark.Pos.Y, portEndX, portEndY, laylineColor)
+}
+
 func (a *Arena) Draw(screen *ebiten.Image, raceStarted bool) {
 	// Draw starting line if we have exactly 2 marks (Pin and Committee)
 	if len(a.Marks) == 2 {
@@ -99,6 +132,11 @@ func (a *Arena) Draw(screen *ebiten.Image, raceStarted bool) {
 
 		// Draw dotted line
 		a.drawDottedLine(screen, pin.Pos.X, pin.Pos.Y, committee.Pos.X, committee.Pos.Y, lineColor)
+	}
+
+	// Draw laylines for upwind mark (if we have 3 marks including upwind)
+	if len(a.Marks) >= 3 {
+		a.drawLaylines(screen)
 	}
 
 	// Draw marks

@@ -71,6 +71,7 @@ This will:
 - **Boat Speed**: Determined by realistic polar curves
 - **VMG**: Velocity Made Good towards/away from wind
 - **Starting Line**: 400 meter line with pin flag and committee boat
+- **Mark Laylines**: Visual aids showing optimal sailing angles to the upwind mark
 - **Infinite World**: Sail in any direction without boundaries
 
 ## Technical Details
