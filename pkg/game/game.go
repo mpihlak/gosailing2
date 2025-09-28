@@ -61,10 +61,10 @@ type GameState struct {
 	markRoundingPhase3 bool // Sailed below mark (north to south)
 	markRounded        bool // All three phases completed
 	// Race completion
-	raceFinished      bool          // Whether boat has finished the race
-	finishTime        time.Duration // Race time when boat finished
-	showFinishBanner  bool          // Whether to show finish banner
-	finishBannerTime  time.Time     // When finish banner was triggered
+	raceFinished     bool          // Whether boat has finished the race
+	finishTime       time.Duration // Race time when boat finished
+	showFinishBanner bool          // Whether to show finish banner
+	finishBannerTime time.Time     // When finish banner was triggered
 	// Restart banner
 	showRestartBanner bool      // Whether to show restart banner
 	restartBannerTime time.Time // When restart banner was triggered
@@ -137,31 +137,31 @@ func NewGame() *GameState {
 	cameraY := lineY - float64(ScreenHeight)/2 + 100        // Show line and area below
 
 	return &GameState{
-		Boat:              boat,
-		Arena:             arena,
-		Wind:              wind,
-		Dashboard:         dash,
-		CameraX:           cameraX,
-		CameraY:           cameraY,
-		mobileControls:    NewMobileControls(ScreenWidth, ScreenHeight),
-		worldImage:        ebiten.NewImage(WorldWidth, WorldHeight),
-		isPaused:          true,            // Start game in paused mode
-		timerDuration:     1 * time.Minute, // Race starts after 1 minute
-		elapsedTime:       0,               // No time elapsed yet
-		lastUpdateTime:    time.Now(),      // Initialize update time
-		raceStarted:       false,
-		raceTimer:         0, // Race timer starts at 0
-		isOCS:             false,
+		Boat:           boat,
+		Arena:          arena,
+		Wind:           wind,
+		Dashboard:      dash,
+		CameraX:        cameraX,
+		CameraY:        cameraY,
+		mobileControls: NewMobileControls(ScreenWidth, ScreenHeight),
+		worldImage:     ebiten.NewImage(WorldWidth, WorldHeight),
+		isPaused:       true,            // Start game in paused mode
+		timerDuration:  1 * time.Minute, // Race starts after 1 minute
+		elapsedTime:    0,               // No time elapsed yet
+		lastUpdateTime: time.Now(),      // Initialize update time
+		raceStarted:    false,
+		raceTimer:      0, // Race timer starts at 0
+		isOCS:          false,
 		// Mark rounding state
 		markRoundingPhase1: false,
 		markRoundingPhase2: false,
 		markRoundingPhase3: false,
 		markRounded:        false,
 		// Race completion state
-		raceFinished:     false,
-		finishTime:       0,
-		showFinishBanner: false,
-		finishBannerTime: time.Time{},
+		raceFinished:      false,
+		finishTime:        0,
+		showFinishBanner:  false,
+		finishBannerTime:  time.Time{},
 		showRestartBanner: false,
 		restartBannerTime: time.Time{},
 	}
