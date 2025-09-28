@@ -145,10 +145,10 @@ func NewGame() *GameState {
 		CameraY:        cameraY,
 		mobileControls: NewMobileControls(ScreenWidth, ScreenHeight),
 		worldImage:     ebiten.NewImage(WorldWidth, WorldHeight),
-		isPaused:       true,            // Start game in paused mode
+		isPaused:       true,             // Start game in paused mode
 		timerDuration:  30 * time.Second, // Race starts after 30 seconds
-		elapsedTime:    0,               // No time elapsed yet
-		lastUpdateTime: time.Now(),      // Initialize update time
+		elapsedTime:    0,                // No time elapsed yet
+		lastUpdateTime: time.Now(),       // Initialize update time
 		raceStarted:    false,
 		raceTimer:      0, // Race timer starts at 0
 		isOCS:          false,
