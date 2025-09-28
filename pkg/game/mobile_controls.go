@@ -46,7 +46,7 @@ func NewMobileControls(screenWidth, screenHeight int) *MobileControls {
 	buttonSize := 80
 	margin := 20
 
-	return &MobileControls{
+	mc := &MobileControls{
 		// Left arrow button in lower left corner
 		leftButton: TouchZone{
 			X: margin, Y: screenHeight - buttonSize - margin,
@@ -73,6 +73,25 @@ func NewMobileControls(screenWidth, screenHeight int) *MobileControls {
 			Enabled: true,
 		},
 	}
+
+	// Determine touch capability at initialization
+	mc.detectTouchCapability()
+
+	return mc
+}
+
+// detectTouchCapability determines if the device supports touch input
+func (mc *MobileControls) detectTouchCapability() {
+	// Check if there are any active touch points
+	touchIDs := ebiten.AppendTouchIDs(nil)
+	if len(touchIDs) > 0 {
+		mc.hasTouchInput = true
+		return
+	}
+
+	// For desktop applications, default to no touch input
+	// This will be updated if touch input is detected later
+	mc.hasTouchInput = false
 }
 
 // Contains checks if a point is within the touch zone
@@ -90,7 +109,8 @@ func (mc *MobileControls) Update() {
 	mc.pausePressed = false
 	mc.restartPressed = false
 
-	// Check for any touch input to determine if this is a mobile device
+	// Update touch capability detection if touch input is detected
+	// This handles cases where initial detection was conservative
 	touchIDs := ebiten.AppendTouchIDs(nil)
 	if len(touchIDs) > 0 && !mc.hasTouchInput {
 		mc.hasTouchInput = true
@@ -467,26 +487,4 @@ func (mc *MobileControls) drawRightArrow(screen *ebiten.Image, zone TouchZone, f
 			}
 		}
 	}
-}
-
-// drawButton draws a simple button with text
-func (mc *MobileControls) drawButton(screen *ebiten.Image, zone TouchZone, text string, bg color.RGBA) {
-	if !zone.Enabled {
-		return
-	}
-
-	// Draw button background
-	vector.DrawFilledRect(screen,
-		float32(zone.X), float32(zone.Y),
-		float32(zone.Width), float32(zone.Height),
-		bg, false)
-
-	// Draw button border
-	vector.StrokeRect(screen,
-		float32(zone.X), float32(zone.Y),
-		float32(zone.Width), float32(zone.Height),
-		2, color.RGBA{255, 255, 255, 150}, false)
-
-	// Draw button text (centered)
-	ebitenutil.DebugPrintAt(screen, text, zone.X+zone.Width/2-10, zone.Y+zone.Height/2-6)
 }
