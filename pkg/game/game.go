@@ -55,6 +55,16 @@ type GameState struct {
 	secondsLate      float64       // How many seconds late the boat was
 	vmgAtCrossing    float64       // VMG when crossing the line
 	speedPercentage  float64       // Speed as percentage of target beat speed
+	// Mark rounding tracking
+	markRoundingPhase1 bool // Sailed past mark (south to north)
+	markRoundingPhase2 bool // Travelled to left (east to west while north)
+	markRoundingPhase3 bool // Sailed below mark (north to south)
+	markRounded        bool // All three phases completed
+	// Race completion
+	raceFinished      bool          // Whether boat has finished the race
+	finishTime        time.Duration // Race time when boat finished
+	showFinishBanner  bool          // Whether to show finish banner
+	finishBannerTime  time.Time     // When finish banner was triggered
 	// Restart banner
 	showRestartBanner bool      // Whether to show restart banner
 	restartBannerTime time.Time // When restart banner was triggered
@@ -142,6 +152,16 @@ func NewGame() *GameState {
 		raceStarted:       false,
 		raceTimer:         0, // Race timer starts at 0
 		isOCS:             false,
+		// Mark rounding state
+		markRoundingPhase1: false,
+		markRoundingPhase2: false,
+		markRoundingPhase3: false,
+		markRounded:        false,
+		// Race completion state
+		raceFinished:     false,
+		finishTime:       0,
+		showFinishBanner: false,
+		finishBannerTime: time.Time{},
 		showRestartBanner: false,
 		restartBannerTime: time.Time{},
 	}
@@ -232,14 +252,19 @@ func (g *GameState) Update() error {
 		g.showRestartBanner = false
 	}
 
+	// Hide finish banner after 5 seconds
+	if g.showFinishBanner && time.Since(g.finishBannerTime) > 5*time.Second {
+		g.showFinishBanner = false
+	}
+
 	// Check race start timer based on elapsed time
 	if !g.raceStarted && g.elapsedTime >= g.timerDuration {
 		g.raceStarted = true
 		g.raceTimer = 0 // Initialize race timer when race starts
 	}
 
-	// Update race timer if race has started
-	if g.raceStarted {
+	// Update race timer if race has started but not finished
+	if g.raceStarted && !g.raceFinished {
 		g.raceTimer += deltaTime
 	}
 
@@ -283,6 +308,16 @@ func (g *GameState) Update() error {
 					g.speedPercentage = 0
 				}
 			}
+		}
+
+		// Mark rounding detection (only if race has started and boat has crossed starting line)
+		if g.hasCrossedLine && !g.raceFinished {
+			g.updateMarkRounding()
+		}
+
+		// Finish line detection (only if boat has started and rounded the mark)
+		if g.hasCrossedLine && g.markRounded && !g.raceFinished {
+			g.checkFinishLineCrossing()
 		}
 	}
 
@@ -366,7 +401,7 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	screen.DrawImage(g.worldImage, op)
 
 	// Draw dashboard directly to screen (UI always visible)
-	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.timerDuration, g.elapsedTime, g.hasCrossedLine, g.secondsLate, g.speedPercentage)
+	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.timerDuration, g.elapsedTime, g.hasCrossedLine, g.secondsLate, g.speedPercentage, g.markRounded, g.raceFinished)
 
 	// Draw race timer at top center (when race hasn't started)
 	g.drawRaceTimer(screen)
@@ -382,6 +417,11 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	// Show RESTART banner when game was restarted
 	if g.showRestartBanner {
 		g.drawRestartBanner(screen)
+	}
+
+	// Show FINISH banner when race is finished
+	if g.showFinishBanner {
+		g.drawFinishBanner(screen)
 	}
 
 	// Draw help screen when paused
@@ -406,6 +446,8 @@ How to Play:
   🎯 Start racing when the timer reaches zero
   ⚠️  Avoid being OCS (On Course Side) at start
   🏁 Cross the starting line after race begins
+  ⛵ Sail upwind and round the mark (leave to port)
+  🏆 Return and cross finish line to complete race
   💨 Use wind angles for optimal speed
 
 Touch Controls:
@@ -437,6 +479,8 @@ How to Play:
   🎯 Start racing when the timer reaches zero
   ⚠️  Avoid being OCS (On Course Side) at start
   🏁 Cross the starting line after race begins
+  ⛵ Sail upwind and round the mark (leave to port)
+  🏆 Return and cross finish line to complete race
   💨 Use wind angles for optimal speed
 
 Controls:
@@ -554,6 +598,96 @@ func (g *GameState) drawRaceTimer(screen *ebiten.Image) {
 		labelY := y - 15             // Above the timer
 		ebitenutil.DebugPrintAt(screen, labelText, labelX, labelY)
 	}
+}
+
+// updateMarkRounding tracks the three phases of mark rounding
+func (g *GameState) updateMarkRounding() {
+	// Get upwind mark position (it's the third mark in the arena)
+	if len(g.Arena.Marks) < 3 {
+		return
+	}
+	upwindMark := g.Arena.Marks[2] // Upwind mark
+
+	boatPos := g.Boat.Pos
+
+	// Phase 1: Sailed past mark (south to north of mark)
+	if !g.markRoundingPhase1 {
+		// Check if boat has moved from south (Y > markY) to north (Y < markY) of mark
+		// We use a 1 unit difference as specified
+		if boatPos.Y <= upwindMark.Pos.Y-1 {
+			g.markRoundingPhase1 = true
+		}
+	}
+
+	// Phase 2: Travelled to left (east to west while north of mark)
+	if g.markRoundingPhase1 && !g.markRoundingPhase2 {
+		// Only check this phase while boat is north of the mark
+		if boatPos.Y < upwindMark.Pos.Y {
+			// Check if boat has moved from east (X > markX) to west (X < markX) of mark
+			if boatPos.X <= upwindMark.Pos.X-1 {
+				g.markRoundingPhase2 = true
+			}
+		} else {
+			// If boat moves back south of mark before completing phase 2, reset phase 2
+			// but keep phase 1 completed
+			g.markRoundingPhase2 = false
+		}
+	}
+
+	// Phase 3: Sailed below mark (north to south of mark)
+	if g.markRoundingPhase1 && g.markRoundingPhase2 && !g.markRoundingPhase3 {
+		// Check if boat has moved from north (Y < markY) to south (Y > markY) of mark
+		if boatPos.Y >= upwindMark.Pos.Y+1 {
+			g.markRoundingPhase3 = true
+			g.markRounded = true // All phases complete
+		}
+	}
+
+	// Reset phase 2 if boat drifts back to east while still north of mark
+	if g.markRoundingPhase2 && !g.markRoundingPhase3 && boatPos.Y < upwindMark.Pos.Y {
+		if boatPos.X > upwindMark.Pos.X {
+			g.markRoundingPhase2 = false
+		}
+	}
+}
+
+// checkFinishLineCrossing detects when boat crosses finish line from course side
+func (g *GameState) checkFinishLineCrossing() {
+	// Finish line is same as starting line
+	startLineY := 2400.0
+	bowPos := g.Boat.GetBowPosition()
+
+	// Check if bow crosses from north (course side) to south (finish side)
+	// Boat must be coming from course side (Y < lineY) and cross to finish side (Y >= lineY)
+	if bowPos.Y >= startLineY {
+		// Boat has finished the race!
+		g.raceFinished = true
+		g.finishTime = g.raceTimer
+		g.showFinishBanner = true
+		g.finishBannerTime = time.Now()
+	}
+}
+
+// drawFinishBanner displays the RACE FINISHED banner with race time
+func (g *GameState) drawFinishBanner(screen *ebiten.Image) {
+	bounds := screen.Bounds()
+
+	// Semi-transparent overlay using vector drawing
+	vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, color.RGBA{0, 0, 0, 100}, false)
+
+	// Calculate finish time in minutes and seconds
+	minutes := int(g.finishTime.Minutes())
+	seconds := int(g.finishTime.Seconds()) % 60
+	centiseconds := int((g.finishTime.Milliseconds() % 1000) / 10)
+
+	// FINISH banner text with race time
+	finishText := fmt.Sprintf("*** RACE FINISHED! ***\nTime: %02d:%02d.%02d", minutes, seconds, centiseconds)
+
+	// Center the text
+	x := bounds.Dx()/2 - 100 // Approximate centering (wider than other banners)
+	y := bounds.Dy()/2 - 30
+
+	ebitenutil.DebugPrintAt(screen, finishText, x, y)
 }
 
 func (g *GameState) Layout(outsideWidth, outsideHeight int) (int, int) {

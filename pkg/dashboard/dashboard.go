@@ -118,7 +118,7 @@ func (d *Dashboard) FindBestVMG() float64 {
 	return bestVMG
 }
 
-func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, timerDuration time.Duration, elapsedTime time.Duration, hasCrossedLine bool, secondsLate float64, speedPercentage float64) {
+func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, timerDuration time.Duration, elapsedTime time.Duration, hasCrossedLine bool, secondsLate float64, speedPercentage float64, markRounded bool, raceFinished bool) {
 	windDir, windSpeed := d.Wind.GetWind(d.Boat.Pos)
 	twa := d.Boat.Heading - windDir
 	if twa < -180 {
@@ -141,6 +141,19 @@ func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, tim
 	// Add line crossing information if boat has crossed
 	if hasCrossedLine {
 		msg += fmt.Sprintf("\nLate: %.1f sec\n%% target speed: %.1f%%", secondsLate, speedPercentage)
+	}
+
+	// Add race progress information
+	if raceStarted {
+		if raceFinished {
+			msg += "\nStatus: FINISHED! 🏆"
+		} else if markRounded {
+			msg += "\nStatus: Mark rounded ✓"
+		} else if hasCrossedLine {
+			msg += "\nStatus: Racing to mark ⛵"
+		} else {
+			msg += "\nStatus: Must cross start line"
+		}
 	}
 
 	ebitenutil.DebugPrintAt(screen, msg, screen.Bounds().Dx()-150, 10)

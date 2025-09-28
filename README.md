@@ -5,8 +5,10 @@ A realistic sailing simulation built with LLMs, Go and Ebitengine, playable both
 ## Features
 
 - **Realistic sailing physics** with polar diagrams
-- **Race timing system** with countdown timer
+- **Complete race system** with countdown timer and race finishing
 - **OCS detection** (On Course Side) rule enforcement
+- **Mark rounding detection** with proper sailing rules
+- **Race timing** with finish time display
 - **VMG calculations** (Velocity Made Good)
 - **Interactive starting line** with pin flag and committee boat
 - **Infinite sailing world** without boundaries
@@ -55,7 +57,13 @@ This will:
 2. **Countdown**: Watch the timer count down from 1 minute
 3. **OCS Warning**: Red banner appears if you cross the line early
 4. **Race Start**: Green starting line when timer reaches zero
-5. **Performance**: Track your speed percentage vs optimal beat speed
+5. **Starting**: Cross the starting line from south to north (bow must cross)
+6. **Mark Rounding**: Sail to upwind mark and round it properly:
+   - Sail past the mark (south to north)
+   - Pass to the left side (east to west while north of mark)
+   - Sail below the mark (north to south)
+7. **Finishing**: Cross the finish line from north to south after rounding
+8. **Race Complete**: Timer stops and "RACE FINISHED" banner displays your time
 
 ## Game Mechanics
 
