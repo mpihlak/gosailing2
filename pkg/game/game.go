@@ -66,7 +66,7 @@ func NewGame() *GameState {
 	}
 
 	// Position starting line in center of world, optimized for 720p view
-	// Starting line at Y = 2400, with upwind mark at Y = 600 (1800m upwind)
+	// Starting line at Y = 2400, with upwind mark at Y = 1500 (900m upwind)
 	// This ensures both marks fit within world bounds with camera margin
 	pinX := float64(WorldWidth/2 - 300)       // Pin end (left)
 	committeeX := float64(WorldWidth/2 + 300) // Committee end (right)
@@ -101,9 +101,9 @@ func NewGame() *GameState {
 	boat.VelX = targetPixelSpeed * math.Sin(headingRad)
 	boat.VelY = -targetPixelSpeed * math.Cos(headingRad) // Y inverted
 
-	// Calculate upwind mark position (1800m upwind from starting line center)
+	// Calculate upwind mark position (900m upwind from starting line center)
 	upwindMarkX := (pinX + committeeX) / 2 // Center of starting line
-	upwindMarkY := lineY - 1800            // 1800m upwind (negative Y direction)
+	upwindMarkY := lineY - 900             // 900m upwind (negative Y direction)
 
 	arena := &world.Arena{
 		Marks: []*world.Mark{
@@ -308,7 +308,7 @@ func (g *GameState) updateCamera() {
 	boatScreenY := g.Boat.Pos.Y - g.CameraY
 
 	// Camera margins - start panning when boat gets within this distance from edge
-	margin := 100.0
+	margin := 200.0
 
 	// Pan horizontally if boat is near screen edges
 	if boatScreenX < margin {
