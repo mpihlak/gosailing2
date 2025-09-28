@@ -92,10 +92,6 @@ func (a *Arena) drawWindBarb(screen *ebiten.Image, x, y float64, windDir, windSp
 	shaftLength := 20.0
 
 	// Convert wind direction to radians (wind direction is where wind comes FROM)
-	// Wind barb shaft points FROM wind direction, with barbs/flags at the tail (wind source)
-	// For TWD 355° (wind from 5° west of north), shaft points from 355° toward 175°
-	// In screen coordinates: 0° = up, 90° = right, 180° = down, 270° = left
-	// We need to correct for screen coordinate system where Y+ is down
 	dirRad := windDir * math.Pi / 180.0
 
 	// Calculate shaft end point - shaft points in direction wind is blowing TO
