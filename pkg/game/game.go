@@ -42,7 +42,7 @@ type GameState struct {
 	// Reusable images to avoid creating new ones every frame
 	worldImage *ebiten.Image
 	// Race start timer (elapsed time based for pause support)
-	timerDuration  time.Duration // Total duration for race start (1 minute)
+	timerDuration  time.Duration // Total duration for race start (30 seconds)
 	elapsedTime    time.Duration // Time elapsed since game start (only when not paused)
 	lastUpdateTime time.Time     // Last time Update was called (for calculating delta)
 	raceStarted    bool          // Whether the race has started
@@ -146,7 +146,7 @@ func NewGame() *GameState {
 		mobileControls: NewMobileControls(ScreenWidth, ScreenHeight),
 		worldImage:     ebiten.NewImage(WorldWidth, WorldHeight),
 		isPaused:       true,            // Start game in paused mode
-		timerDuration:  1 * time.Minute, // Race starts after 1 minute
+		timerDuration:  30 * time.Second, // Race starts after 30 seconds
 		elapsedTime:    0,               // No time elapsed yet
 		lastUpdateTime: time.Now(),      // Initialize update time
 		raceStarted:    false,
