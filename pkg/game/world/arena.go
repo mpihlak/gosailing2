@@ -4,7 +4,7 @@ import (
 	"image/color"
 	"math"
 
-		"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/mpihlak/gosailing2/pkg/geometry"
 )
@@ -27,6 +27,18 @@ func (m *Mark) Draw(screen *ebiten.Image) {
 		}
 		// Mark base (small circle)
 		ebitenutil.DrawRect(screen, m.Pos.X-2, m.Pos.Y-2, 4, 4, color.RGBA{255, 0, 0, 255})
+	} else if m.Name == "Upwind" {
+		// Draw upwind mark with orange flag (same design as pin)
+		// Flag pole (vertical line)
+		ebitenutil.DrawLine(screen, m.Pos.X, m.Pos.Y-10, m.Pos.X, m.Pos.Y+5, color.RGBA{139, 69, 19, 255}) // Brown pole
+		// Flag (small triangle)
+		flagColor := color.RGBA{255, 165, 0, 255} // Orange flag
+		// Draw flag as small filled triangle
+		for i := 0; i < 6; i++ {
+			ebitenutil.DrawLine(screen, m.Pos.X, m.Pos.Y-10+float64(i), m.Pos.X+8-float64(i), m.Pos.Y-10+float64(i), flagColor)
+		}
+		// Mark base (small circle)
+		ebitenutil.DrawRect(screen, m.Pos.X-2, m.Pos.Y-2, 4, 4, color.RGBA{255, 165, 0, 255}) // Orange base
 	} else {
 		// Draw regular mark (committee boat)
 		ebitenutil.DrawRect(screen, m.Pos.X-5, m.Pos.Y-5, 10, 10, color.RGBA{255, 0, 0, 255})

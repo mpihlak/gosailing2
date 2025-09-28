@@ -22,8 +22,8 @@ const (
 	ScreenHeight = 720
 	// Real world scale: 1 pixel = 1 meter for easier calculations
 	PixelsPerMeter = 1.0
-	WorldWidth     = 2000 // World is larger than screen
-	WorldHeight    = 1500
+	WorldWidth     = 2000                 // World is larger than screen
+	WorldHeight    = 3000                 // Expanded to accommodate upwind mark at Y=-1200
 	inputDelay     = 0 * time.Millisecond // Delay between keystroke readings
 )
 
@@ -66,10 +66,11 @@ func NewGame() *GameState {
 	}
 
 	// Position starting line in center of world, optimized for 720p view
-	// Starting line at Y = 600, with room above and below
+	// Starting line at Y = 2400, with upwind mark at Y = 600 (1800m upwind)
+	// This ensures both marks fit within world bounds with camera margin
 	pinX := float64(WorldWidth/2 - 300)       // Pin end (left)
 	committeeX := float64(WorldWidth/2 + 300) // Committee end (right)
-	lineY := float64(600)
+	lineY := float64(2400)                    // Positioned to accommodate upwind mark
 
 	// Boat starts 180 meters below middle of line, sailing parallel to line towards committee boat
 	boatStartX := (pinX + committeeX) / 2 // Middle of the starting line
@@ -99,18 +100,25 @@ func NewGame() *GameState {
 	targetPixelSpeed := targetSpeed * 30.0 / 6.0 / 60.0 // speedScale / 60.0
 	boat.VelX = targetPixelSpeed * math.Sin(headingRad)
 	boat.VelY = -targetPixelSpeed * math.Cos(headingRad) // Y inverted
+
+	// Calculate upwind mark position (1800m upwind from starting line center)
+	upwindMarkX := (pinX + committeeX) / 2 // Center of starting line
+	upwindMarkY := lineY - 1800            // 1800m upwind (negative Y direction)
+
 	arena := &world.Arena{
 		Marks: []*world.Mark{
 			{Pos: geometry.Point{X: pinX, Y: lineY}, Name: "Pin"},
 			{Pos: geometry.Point{X: committeeX, Y: lineY}, Name: "Committee"},
+			{Pos: geometry.Point{X: upwindMarkX, Y: upwindMarkY}, Name: "Upwind"},
 		},
 	}
 	dash := &dashboard.Dashboard{
-		Boat:      boat,
-		Wind:      wind,
-		StartTime: time.Now().Add(5 * time.Minute),
-		LineStart: geometry.Point{X: pinX, Y: lineY},       // Pin end
-		LineEnd:   geometry.Point{X: committeeX, Y: lineY}, // Committee end
+		Boat:       boat,
+		Wind:       wind,
+		StartTime:  time.Now().Add(5 * time.Minute),
+		LineStart:  geometry.Point{X: pinX, Y: lineY},              // Pin end
+		LineEnd:    geometry.Point{X: committeeX, Y: lineY},        // Committee end
+		UpwindMark: geometry.Point{X: upwindMarkX, Y: upwindMarkY}, // Upwind mark
 	}
 
 	// Initialize camera to show full starting area (center on starting line)
@@ -219,8 +227,8 @@ func (g *GameState) Update() error {
 	}
 
 	// OCS detection - check if boat is above (course side of) the starting line
-	// Starting line is at Y = 600, boat is OCS if Y < 600
-	startLineY := 600.0
+	// Starting line is at Y = 2400, boat is OCS if Y < 2400
+	startLineY := 2400.0
 	if !g.raceStarted {
 		// Before race start, check if boat crosses to course side
 		if g.Boat.Pos.Y < startLineY {

@@ -14,11 +14,12 @@ import (
 )
 
 type Dashboard struct {
-	Boat      *objects.Boat
-	Wind      world.Wind
-	StartTime time.Time
-	LineStart geometry.Point // Pin end of starting line
-	LineEnd   geometry.Point // Committee end of starting line
+	Boat       *objects.Boat
+	Wind       world.Wind
+	StartTime  time.Time
+	LineStart  geometry.Point // Pin end of starting line
+	LineEnd    geometry.Point // Committee end of starting line
+	UpwindMark geometry.Point // Upwind mark position
 }
 
 // CalculateDistanceToLine calculates the perpendicular distance from boat's bow to the starting line
@@ -55,6 +56,26 @@ func (d *Dashboard) CalculateVMG() float64 {
 	// VMG = Speed * cos(TWA)
 	twaRad := twa * math.Pi / 180
 	return d.Boat.Speed * math.Cos(twaRad)
+}
+
+// CalculateBearingToUpwindMark calculates bearing from boat to upwind mark in degrees
+func (d *Dashboard) CalculateBearingToUpwindMark() float64 {
+	// Calculate delta X and Y from boat to upwind mark
+	dx := d.UpwindMark.X - d.Boat.Pos.X
+	dy := d.UpwindMark.Y - d.Boat.Pos.Y
+
+	// Calculate bearing in radians (atan2 gives angle from positive X-axis)
+	bearingRad := math.Atan2(dx, -dy) // -dy because Y is inverted in screen coordinates
+
+	// Convert to degrees
+	bearingDeg := bearingRad * 180 / math.Pi
+
+	// Normalize to 0-360 range
+	if bearingDeg < 0 {
+		bearingDeg += 360
+	}
+
+	return bearingDeg
 }
 
 // FindBestVMG finds the best VMG achievable for current sailing mode (beat or run)
@@ -109,11 +130,12 @@ func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, tim
 	distanceToLine := d.CalculateDistanceToLine()
 	currentVMG := d.CalculateVMG()
 	targetVMG := d.FindBestVMG()
+	bearingToUpwind := d.CalculateBearingToUpwindMark()
 
 	// Base dashboard message
 	msg := fmt.Sprintf(
-		"Speed: %.1f kts\nHeading: %.0f°\nTWA: %.0f°\nTWS: %.1f kts\nDist to Line: %.0fm\nVMG: %.1f kts\nTarget VMG: %.1f kts",
-		d.Boat.Speed, d.Boat.Heading, twa, windSpeed, distanceToLine, currentVMG, targetVMG,
+		"Speed: %.1f kts\nHeading: %.0f°\nTWA: %.0f°\nTWS: %.1f kts\nDist to Line: %.0fm\nVMG: %.1f kts\nTarget VMG: %.1f kts\nUpwind Brg: %.0f°",
+		d.Boat.Speed, d.Boat.Heading, twa, windSpeed, distanceToLine, currentVMG, targetVMG, bearingToUpwind,
 	)
 
 	// Add line crossing information if boat has crossed
