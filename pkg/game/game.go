@@ -77,10 +77,10 @@ func NewGame() *GameState {
 	}
 
 	// Position starting line in center of world, optimized for 720p view
-	// Starting line at Y = 2400, with upwind mark at Y = 1500 (900m upwind)
-	// This ensures both marks fit within world bounds with camera margin
-	pinX := float64(WorldWidth/2 - 300)       // Pin end (left)
-	committeeX := float64(WorldWidth/2 + 300) // Committee end (right)
+	// Starting line at Y = 2400, shorter line (400m instead of 600m)
+	// Upwind mark positioned to be immediately visible at top of screen
+	pinX := float64(WorldWidth/2 - 200)       // Pin end (left) - shorter line
+	committeeX := float64(WorldWidth/2 + 200) // Committee end (right) - shorter line
 	lineY := float64(2400)                    // Positioned to accommodate upwind mark
 
 	// Boat starts 180 meters below middle of line, sailing parallel to line towards committee boat
@@ -112,9 +112,9 @@ func NewGame() *GameState {
 	boat.VelX = targetPixelSpeed * math.Sin(headingRad)
 	boat.VelY = -targetPixelSpeed * math.Cos(headingRad) // Y inverted
 
-	// Calculate upwind mark position (900m upwind from starting line center)
-	upwindMarkX := (pinX + committeeX) / 2 // Center of starting line
-	upwindMarkY := lineY - 900             // 900m upwind (negative Y direction)
+	// Calculate upwind mark position (positioned to be visible at top of screen)
+	upwindMarkX := (pinX + committeeX) / 2             // Center of starting line
+	upwindMarkY := lineY - float64(ScreenHeight) + 100 // Visible at top of screen with margin
 
 	arena := &world.Arena{
 		Marks: []*world.Mark{
@@ -134,7 +134,7 @@ func NewGame() *GameState {
 
 	// Initialize camera to show full starting area (center on starting line)
 	cameraX := (pinX+committeeX)/2 - float64(ScreenWidth)/2 // Center line horizontally
-	cameraY := lineY - float64(ScreenHeight)/2 + 100        // Show line and area below
+	cameraY := lineY - float64(ScreenHeight)/2 + 50         // Show line and upwind mark
 
 	return &GameState{
 		Boat:           boat,
@@ -369,7 +369,7 @@ func (g *GameState) updateCamera() {
 		g.CameraX = g.Boat.Pos.X - (float64(ScreenWidth) - margin)
 	}
 
-	// Pan vertically if boat is near screen edges
+	// Pan vertically if boat is near screen edges (200px from top/bottom)
 	if boatScreenY < margin {
 		g.CameraY = g.Boat.Pos.Y - margin
 	} else if boatScreenY > float64(ScreenHeight)-margin {

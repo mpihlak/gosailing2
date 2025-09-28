@@ -70,7 +70,7 @@ This will:
 - **Wind**: Constant 15 knots from North (0°)
 - **Boat Speed**: Determined by realistic polar curves
 - **VMG**: Velocity Made Good towards/away from wind
-- **Starting Line**: 1000+ meter line with pin flag and committee boat
+- **Starting Line**: 400 meter line with pin flag and committee boat
 - **Infinite World**: Sail in any direction without boundaries
 
 ## Technical Details
