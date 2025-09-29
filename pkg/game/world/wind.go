@@ -152,7 +152,7 @@ func (ow *OscillatingWind) Update() {
 
 func (ow *OscillatingWind) startNewShift(now time.Time) {
 	// Generate new shift parameters
-	ow.shiftDuration = time.Duration(3+rand.Intn(13)) * time.Second // 3-15 seconds
+	ow.shiftDuration = time.Duration(8+rand.Intn(13)) * time.Second // 8-20 seconds
 	ow.shiftAngle = -10.0 + rand.Float64()*20.0                     // -10 to +10 degrees
 
 	// Reset shift state
