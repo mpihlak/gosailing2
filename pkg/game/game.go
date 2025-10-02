@@ -50,11 +50,12 @@ type GameState struct {
 	// OCS detection
 	isOCS bool // Whether boat is On Course Side
 	// Line crossing tracking
-	hasCrossedLine   bool          // Whether boat has crossed the starting line after race start
-	lineCrossingTime time.Duration // When boat crossed the line (elapsed time)
-	secondsLate      float64       // How many seconds late the boat was
-	vmgAtCrossing    float64       // VMG when crossing the line
-	speedPercentage  float64       // Speed as percentage of target beat speed
+	hasCrossedLine   bool           // Whether boat has crossed the starting line after race start
+	lineCrossingTime time.Duration  // When boat crossed the line (elapsed time)
+	secondsLate      float64        // How many seconds late the boat was
+	vmgAtCrossing    float64        // VMG when crossing the line
+	speedPercentage  float64        // Speed as percentage of target beat speed
+	prevBowPos       geometry.Point // Previous frame's bow position for crossing detection
 	// Mark rounding tracking
 	markRoundingPhase1 bool // Sailed past mark (south to north)
 	markRoundingPhase2 bool // Travelled to left (east to west while north)
@@ -153,6 +154,7 @@ func NewGame() *GameState {
 		raceStarted:    false,
 		raceTimer:      0, // Race timer starts at 0
 		isOCS:          false,
+		prevBowPos:     geometry.Point{X: boatStartX, Y: boatStartY}, // Initialize to boat start position
 		// Mark rounding state
 		markRoundingPhase1: false,
 		markRoundingPhase2: false,
@@ -274,30 +276,32 @@ func (g *GameState) Update() error {
 		g.raceTimer += deltaTime
 	}
 
-	// OCS detection - check if boat is above (course side of) the starting line
-	// Starting line is at Y = 2400, boat is OCS if Y < 2400
+	// OCS detection and clearing - check if boat's bow is above (course side of) the starting line
+	// Starting line is at Y = 2400, boat is OCS if bow crosses between pin and committee boat before race start
 	startLineY := 2400.0
+	bowPos := g.Boat.GetBowPosition()
+
 	if !g.raceStarted {
-		// Before race start, check if boat crosses to course side
-		if g.Boat.Pos.Y < startLineY {
+		// Before race start, boat goes OCS if bow crosses the line between pin and committee boat
+		if bowPos.Y <= startLineY && g.isWithinLineBounds(bowPos) {
 			g.isOCS = true
-		} else if g.isOCS && g.Boat.Pos.Y > startLineY {
-			// Clear OCS only when boat dips below the line
+		}
+		// Clear OCS only when boat crosses back below the line between pin and committee boat
+		if g.isOCS && bowPos.Y > startLineY && g.isWithinLineBounds(bowPos) {
 			g.isOCS = false
 		}
 	} else {
-		// After race start, only clear OCS if boat goes below the line
-		// (boat can still be OCS from before race start)
-		if g.isOCS && g.Boat.Pos.Y > startLineY {
+		// After race start, OCS can still be cleared by crossing back below the line between pin and committee boat
+		if g.isOCS && bowPos.Y > startLineY && g.isWithinLineBounds(bowPos) {
 			g.isOCS = false
 		}
 
 		// Line crossing detection after race start
 		// Only count line crossing if boat is not currently OCS (has cleared OCS properly)
 		if !g.hasCrossedLine && !g.isOCS {
-			bowPos := g.Boat.GetBowPosition()
-			// Check if bow crosses the starting line (from below to above)
-			if bowPos.Y <= startLineY {
+			// Check if bow crosses the Y coordinate from below (prevBowPos.Y > startLineY) to above (bowPos.Y <= startLineY)
+			// AND the boat is within line bounds at the moment of crossing
+			if g.prevBowPos.Y > startLineY && bowPos.Y <= startLineY && g.isWithinLineBounds(bowPos) {
 				g.hasCrossedLine = true
 				g.lineCrossingTime = g.elapsedTime
 				// Calculate how late the boat was (time after race start)
@@ -326,6 +330,9 @@ func (g *GameState) Update() error {
 			g.checkFinishLineCrossing()
 		}
 	}
+
+	// Update previous bow position for next frame's crossing detection
+	g.prevBowPos = bowPos
 
 	// Input handling with delay to prevent overturning
 	if time.Since(g.lastInput) >= inputDelay {
@@ -615,6 +622,19 @@ func (g *GameState) drawOCSWarning(screen *ebiten.Image) {
 	ebitenutil.DebugPrintAt(screen, "*** OCS ***", ocsX, ocsY)
 }
 
+// isWithinLineBounds checks if the boat's bow position is within the start/finish line bounds
+// (between pin and committee boat)
+func (g *GameState) isWithinLineBounds(bowPos geometry.Point) bool {
+	lineStart := g.Dashboard.LineStart
+	lineEnd := g.Dashboard.LineEnd
+
+	// Check if X coordinate is between pin and committee boat
+	minX := math.Min(lineStart.X, lineEnd.X)
+	maxX := math.Max(lineStart.X, lineEnd.X)
+
+	return bowPos.X >= minX && bowPos.X <= maxX
+}
+
 // updateMarkRounding tracks the three phases of mark rounding
 func (g *GameState) updateMarkRounding() {
 	// Get upwind mark position (it's the third mark in the arena)
@@ -672,9 +692,9 @@ func (g *GameState) checkFinishLineCrossing() {
 	startLineY := 2400.0
 	bowPos := g.Boat.GetBowPosition()
 
-	// Check if bow crosses from north (course side) to south (finish side)
+	// Check if bow crosses from north (course side) to south (finish side) AND is within line bounds
 	// Boat must be coming from course side (Y < lineY) and cross to finish side (Y >= lineY)
-	if bowPos.Y >= startLineY {
+	if bowPos.Y >= startLineY && g.isWithinLineBounds(bowPos) {
 		// Boat has finished the race!
 		g.raceFinished = true
 		g.finishTime = g.raceTimer
