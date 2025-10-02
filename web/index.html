@@ -108,6 +108,9 @@
         <div style="margin-top: 10px; font-size: 0.9em; color: #888;">
             Downloading and initializing WebAssembly module
         </div>
+        <div style="margin-top: 10px; font-size: 0.8em; color: #666;">
+            Note: Leaderboard requires Firebase configuration
+        </div>
     </div>
 
     <div class="controls" style="display: none;" id="controls">
@@ -118,6 +121,34 @@
         <p>There was an error loading the sailing game. Please check the browser console for details.</p>
         <div id="error-details" style="margin-top: 10px; font-family: monospace; font-size: 0.8em;"></div>
     </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <script>
+        // Firebase configuration (replace with your actual config)
+        const firebaseConfig = {
+        apiKey: "AIzaSyCs2ZrKGyZyxPJqjsRtNQFfQ5EGD9eNXsw",
+        authDomain: "gosailing-9428f.firebaseapp.com",
+        projectId: "gosailing-9428f",
+        storageBucket: "gosailing-9428f.firebasestorage.app",
+        messagingSenderId: "1007451740837",
+        appId: "1:1007451740837:web:1b6542ffa9cdab16004b4c",
+        measurementId: "G-0BHDR86N2P"
+        };
+
+        // Initialize Firebase
+        try {
+            firebase.initializeApp(firebaseConfig);
+            // Make Firebase globally available for WASM
+            window.firebase = firebase;
+            console.log('Firebase initialized successfully');
+        } catch (error) {
+            console.warn('Firebase initialization failed:', error);
+            console.log('Game will run without leaderboard functionality');
+        }
+    </script>
 
     <script src="wasm_exec.js"></script>
     <script>

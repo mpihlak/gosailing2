@@ -93,6 +93,15 @@ func copyWASMFiles() error {
 }
 
 func createHTMLFile() error {
+	htmlPath := filepath.Join(wasmDir, "index.html")
+
+	// Check if index.html already exists, don't overwrite it
+	if _, err := os.Stat(htmlPath); err == nil {
+		fmt.Println("index.html already exists, keeping existing version")
+		return nil
+	}
+
+	fmt.Println("Creating new index.html (no existing file found)")
 	html := `<!DOCTYPE html>
 <html>
 <head>
@@ -240,7 +249,6 @@ func createHTMLFile() error {
 </body>
 </html>`
 
-	htmlPath := filepath.Join(wasmDir, "index.html")
 	return os.WriteFile(htmlPath, []byte(html), 0644)
 }
 

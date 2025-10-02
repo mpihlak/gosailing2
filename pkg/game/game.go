@@ -71,6 +71,8 @@ type GameState struct {
 	// Restart banner
 	showRestartBanner bool      // Whether to show restart banner
 	restartBannerTime time.Time // When restart banner was triggered
+	// Scoreboard
+	scoreboard *Scoreboard // Leaderboard display
 }
 
 func NewGame() *GameState {
@@ -149,6 +151,7 @@ func NewGame() *GameState {
 		CameraY:        cameraY,
 		mobileControls: NewMobileControls(ScreenWidth, ScreenHeight),
 		telltales:      NewTelltales(ScreenWidth, ScreenHeight),
+		scoreboard:     NewScoreboard(),
 		worldImage:     ebiten.NewImage(WorldWidth, WorldHeight),
 		isPaused:       true,             // Start game in paused mode
 		timerDuration:  30 * time.Second, // Race starts after 30 seconds
@@ -177,6 +180,9 @@ func (g *GameState) Update() error {
 	// Process mobile touch input
 	g.mobileControls.Update()
 	mobileInput := g.mobileControls.GetMobileInput()
+
+	// Update scoreboard (handles input when visible)
+	g.scoreboard.Update()
 
 	// Handle quit key - different behavior for WASM vs standalone
 	if ebiten.IsKeyPressed(ebiten.KeyQ) {
@@ -242,8 +248,8 @@ func (g *GameState) Update() error {
 		}
 	}
 
-	// Don't update game logic when paused
-	if g.isPaused {
+	// Don't update game logic when paused (but allow scoreboard updates)
+	if g.isPaused && !g.scoreboard.IsVisible() {
 		return nil
 	}
 
@@ -453,6 +459,9 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	if g.isPaused {
 		g.drawHelpScreen(screen)
 	}
+
+	// Draw scoreboard (always on top)
+	g.scoreboard.Draw(screen)
 }
 
 // drawHelpScreen displays the help overlay when game is paused
@@ -710,7 +719,35 @@ func (g *GameState) checkFinishLineCrossing() {
 		g.finishTime = g.raceTimer
 		g.showFinishBanner = true
 		g.finishBannerTime = time.Now()
+
+		// Show scoreboard after a short delay (let finish banner show first)
+		go func() {
+			time.Sleep(3 * time.Second)
+			if g.raceFinished && !g.scoreboard.IsVisible() {
+				g.showScoreboard()
+			}
+		}()
 	}
+}
+
+// showScoreboard displays the scoreboard with current race result
+func (g *GameState) showScoreboard() {
+	// Only show scoreboard in WASM version
+	if !IsWASM() {
+		return
+	}
+
+	// Create race result from current game state
+	result := &RaceResult{
+		PlayerName:      "", // Will be filled by user
+		RaceTimeSeconds: g.finishTime.Seconds(),
+		SecondsLate:     g.secondsLate,
+		SpeedPercentage: g.speedPercentage,
+		MarkRounded:     g.markRounded,
+		Timestamp:       time.Now(),
+	}
+
+	g.scoreboard.Show(result)
 }
 
 // drawFinishBanner displays the RACE FINISHED banner with race time
