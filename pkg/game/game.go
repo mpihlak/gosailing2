@@ -184,58 +184,65 @@ func (g *GameState) Update() error {
 	// Update scoreboard (handles input when visible)
 	g.scoreboard.Update()
 
-	// Handle quit key - different behavior for WASM vs standalone
-	if ebiten.IsKeyPressed(ebiten.KeyQ) {
-		if IsWASM() {
-			// In WASM, pause the game and show help screen instead of quitting
-			g.isPaused = true
-			return nil
-		} else {
-			// In standalone, return error to exit the application
-			return fmt.Errorf("game quit by user")
+	// Skip game input handling when scoreboard is accepting text input
+	if !g.scoreboard.IsCapturingInput() {
+		// Handle quit key - different behavior for WASM vs standalone
+		if ebiten.IsKeyPressed(ebiten.KeyQ) {
+			if IsWASM() {
+				// In WASM, pause the game and show help screen instead of quitting
+				g.isPaused = true
+				return nil
+			} else {
+				// In standalone, return error to exit the application
+				return fmt.Errorf("game quit by user")
+			}
 		}
-	}
 
-	// Handle 'c' key to toggle mobile controls display for testing
-	if inpututil.IsKeyJustPressed(ebiten.KeyC) {
-		g.mobileControls.ToggleControlsOverride()
-	}
+		// Handle 'c' key to toggle mobile controls display for testing
+		if inpututil.IsKeyJustPressed(ebiten.KeyC) {
+			g.mobileControls.ToggleControlsOverride()
+		}
 
-	// Handle restart key (keyboard or mobile)
-	if inpututil.IsKeyJustPressed(ebiten.KeyR) || mobileInput.RestartPressed {
-		newGame := NewGame()
-		*g = *newGame
-		// Unpause and show restart banner
-		g.isPaused = false
-		g.showRestartBanner = true
-		g.restartBannerTime = time.Now()
-		return nil
-	}
+		// Handle restart key (keyboard or mobile)
+		if inpututil.IsKeyJustPressed(ebiten.KeyR) || mobileInput.RestartPressed {
+			newGame := NewGame()
+			*g = *newGame
+			// Unpause and show restart banner
+			g.isPaused = false
+			g.showRestartBanner = true
+			g.restartBannerTime = time.Now()
+			return nil
+		}
 
-	// Handle 'J' key to jump timer forward by 10 seconds (only before race starts)
-	if inpututil.IsKeyJustPressed(ebiten.KeyJ) && !g.raceStarted {
-		g.elapsedTime += 10 * time.Second
-		// Make sure we don't go past the timer duration
-		if g.elapsedTime > g.timerDuration {
-			g.elapsedTime = g.timerDuration
+		// Handle 'J' key to jump timer forward by 10 seconds (only before race starts)
+		if inpututil.IsKeyJustPressed(ebiten.KeyJ) && !g.raceStarted {
+			g.elapsedTime += 10 * time.Second
+			// Make sure we don't go past the timer duration
+			if g.elapsedTime > g.timerDuration {
+				g.elapsedTime = g.timerDuration
+			}
 		}
 	}
 
 	// Handle pause toggle (keyboard or mobile)
-	pauseTogglePressed := inpututil.IsKeyJustPressed(ebiten.KeySpace) || mobileInput.PausePressed
+	// Skip pause handling when scoreboard is capturing input (except mobile touch)
+	var pauseTogglePressed bool
+	if !g.scoreboard.IsCapturingInput() {
+		pauseTogglePressed = inpututil.IsKeyJustPressed(ebiten.KeySpace) || mobileInput.PausePressed
 
-	// On mobile, any touch when paused should unpause (except on buttons)
-	if g.isPaused && g.mobileControls.hasTouchInput {
-		justPressedTouchIDs := inpututil.AppendJustPressedTouchIDs(nil)
-		for _, touchID := range justPressedTouchIDs {
-			x, y := ebiten.TouchPosition(touchID)
-			// Only unpause if touch is not on any mobile control buttons
-			if !g.mobileControls.pauseButton.Contains(x, y) &&
-				!g.mobileControls.leftButton.Contains(x, y) &&
-				!g.mobileControls.rightButton.Contains(x, y) &&
-				!g.mobileControls.restartButton.Contains(x, y) {
-				pauseTogglePressed = true
-				break
+		// On mobile, any touch when paused should unpause (except on buttons)
+		if g.isPaused && g.mobileControls.hasTouchInput {
+			justPressedTouchIDs := inpututil.AppendJustPressedTouchIDs(nil)
+			for _, touchID := range justPressedTouchIDs {
+				x, y := ebiten.TouchPosition(touchID)
+				// Only unpause if touch is not on any mobile control buttons
+				if !g.mobileControls.pauseButton.Contains(x, y) &&
+					!g.mobileControls.leftButton.Contains(x, y) &&
+					!g.mobileControls.rightButton.Contains(x, y) &&
+					!g.mobileControls.restartButton.Contains(x, y) {
+					pauseTogglePressed = true
+					break
+				}
 			}
 		}
 	}
@@ -344,7 +351,8 @@ func (g *GameState) Update() error {
 	g.prevBowPos = bowPos
 
 	// Input handling with delay to prevent overturning
-	if time.Since(g.lastInput) >= inputDelay {
+	// Skip boat movement input when scoreboard is capturing text input
+	if time.Since(g.lastInput) >= inputDelay && !g.scoreboard.IsCapturingInput() {
 		// Check keyboard input
 		keyboardLeft := ebiten.IsKeyPressed(ebiten.KeyLeft) || ebiten.IsKeyPressed(ebiten.KeyA)
 		keyboardRight := ebiten.IsKeyPressed(ebiten.KeyRight) || ebiten.IsKeyPressed(ebiten.KeyD)

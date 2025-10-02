@@ -25,11 +25,11 @@ type RaceResult struct {
 
 // LeaderboardEntry represents a formatted leaderboard entry for display
 type LeaderboardEntry struct {
-	Rank        int
-	PlayerName  string
-	RaceTime    string
-	SecondsLate string
-	IsPlayer    bool // Highlight current player's entry
+	Rank          int
+	PlayerName    string
+	RaceTime      string
+	SecondsLate   string
+	IsCurrentRace bool // Highlight the most recent race result
 }
 
 // Scoreboard manages the leaderboard display and player name input
@@ -43,8 +43,9 @@ type Scoreboard struct {
 	nameSubmitted bool
 
 	// Leaderboard data
-	leaderboard   []LeaderboardEntry
-	currentResult *RaceResult
+	leaderboard      []LeaderboardEntry
+	currentRaceEntry *LeaderboardEntry // Current race entry (may be outside top 10)
+	currentResult    *RaceResult
 
 	// UI state
 	cursorBlink bool
@@ -72,12 +73,13 @@ func NewScoreboard() *Scoreboard {
 	}
 
 	return &Scoreboard{
-		isVisible:   false,
-		state:       StateEnterName,
-		playerName:  "",
-		leaderboard: make([]LeaderboardEntry, 0),
-		firebase:    firebase,
-		lastBlink:   time.Now(),
+		isVisible:        false,
+		state:            StateEnterName,
+		playerName:       "",
+		leaderboard:      make([]LeaderboardEntry, 0),
+		currentRaceEntry: nil,
+		firebase:         firebase,
+		lastBlink:        time.Now(),
 	}
 }
 
@@ -99,11 +101,17 @@ func (s *Scoreboard) Hide() {
 	s.playerName = ""
 	s.nameSubmitted = false
 	s.leaderboard = make([]LeaderboardEntry, 0)
+	s.currentRaceEntry = nil
 }
 
 // IsVisible returns whether the scoreboard is currently displayed
 func (s *Scoreboard) IsVisible() bool {
 	return s.isVisible
+}
+
+// IsCapturingInput returns whether the scoreboard is currently capturing text input
+func (s *Scoreboard) IsCapturingInput() bool {
+	return s.isVisible && s.state == StateEnterName
 }
 
 // Update handles input and state updates
@@ -233,16 +241,26 @@ func (s *Scoreboard) createLeaderboard(results []RaceResult) {
 		return completed[i].RaceTimeSeconds < completed[j].RaceTimeSeconds
 	})
 
+	// Find current race in the completed results
+	var currentRaceResult *RaceResult
+	var currentRaceRank int
+	if s.currentResult != nil && s.currentResult.MarkRounded {
+		for i, result := range completed {
+			// Match by player name and exact race time (to identify the specific race)
+			if result.PlayerName == s.currentResult.PlayerName &&
+				fmt.Sprintf("%.2f", result.RaceTimeSeconds) == fmt.Sprintf("%.2f", s.currentResult.RaceTimeSeconds) {
+				currentRaceResult = &result
+				currentRaceRank = i + 1
+				break
+			}
+		}
+	}
+
 	// Create display entries (top 10)
 	s.leaderboard = make([]LeaderboardEntry, 0)
 	maxEntries := 10
 	if len(completed) < maxEntries {
 		maxEntries = len(completed)
-	}
-
-	currentPlayerName := ""
-	if s.currentResult != nil {
-		currentPlayerName = s.currentResult.PlayerName
 	}
 
 	for i := 0; i < maxEntries; i++ {
@@ -260,19 +278,44 @@ func (s *Scoreboard) createLeaderboard(results []RaceResult) {
 			lateStr = "Early"
 		}
 
+		// Check if this is the current race
+		isCurrentRace := currentRaceResult != nil &&
+			result.PlayerName == currentRaceResult.PlayerName &&
+			fmt.Sprintf("%.2f", result.RaceTimeSeconds) == fmt.Sprintf("%.2f", currentRaceResult.RaceTimeSeconds)
+
 		entry := LeaderboardEntry{
-			Rank:        i + 1,
-			PlayerName:  result.PlayerName,
-			RaceTime:    raceTimeStr,
-			SecondsLate: lateStr,
-			IsPlayer:    result.PlayerName == currentPlayerName,
+			Rank:          i + 1,
+			PlayerName:    result.PlayerName,
+			RaceTime:      raceTimeStr,
+			SecondsLate:   lateStr,
+			IsCurrentRace: isCurrentRace,
 		}
 
 		s.leaderboard = append(s.leaderboard, entry)
 	}
-}
 
-// createLocalLeaderboard creates a local leaderboard for standalone mode
+	// Create separate current race entry if it's outside top 10
+	s.currentRaceEntry = nil
+	if currentRaceResult != nil && currentRaceRank > 10 {
+		minutes := int(currentRaceResult.RaceTimeSeconds) / 60
+		seconds := int(currentRaceResult.RaceTimeSeconds) % 60
+		centiseconds := int((currentRaceResult.RaceTimeSeconds - float64(int(currentRaceResult.RaceTimeSeconds))) * 100)
+		raceTimeStr := fmt.Sprintf("%02d:%02d.%02d", minutes, seconds, centiseconds)
+
+		lateStr := fmt.Sprintf("%.1f", currentRaceResult.SecondsLate)
+		if currentRaceResult.SecondsLate < 0 {
+			lateStr = "Early"
+		}
+
+		s.currentRaceEntry = &LeaderboardEntry{
+			Rank:          currentRaceRank,
+			PlayerName:    currentRaceResult.PlayerName,
+			RaceTime:      raceTimeStr,
+			SecondsLate:   lateStr,
+			IsCurrentRace: true,
+		}
+	}
+} // createLocalLeaderboard creates a local leaderboard for standalone mode
 func (s *Scoreboard) createLocalLeaderboard() {
 	if s.currentResult == nil {
 		return
@@ -291,13 +334,14 @@ func (s *Scoreboard) createLocalLeaderboard() {
 
 	s.leaderboard = []LeaderboardEntry{
 		{
-			Rank:        1,
-			PlayerName:  s.currentResult.PlayerName,
-			RaceTime:    raceTimeStr,
-			SecondsLate: lateStr,
-			IsPlayer:    true,
+			Rank:          1,
+			PlayerName:    s.currentResult.PlayerName,
+			RaceTime:      raceTimeStr,
+			SecondsLate:   lateStr,
+			IsCurrentRace: true,
 		},
 	}
+	s.currentRaceEntry = nil // No separate entry needed for local mode
 }
 
 // Draw renders the scoreboard overlay
@@ -403,10 +447,10 @@ func (s *Scoreboard) drawLeaderboard(screen *ebiten.Image) {
 	for i, entry := range s.leaderboard {
 		entryY := startY + 50 + (i * 25)
 
-		// Highlight current player
-		if entry.IsPlayer {
+		// Highlight current race
+		if entry.IsCurrentRace {
 			highlightY := float32(entryY - 2)
-			vector.DrawFilledRect(screen, float32(centerX-195), highlightY, 320, 20, color.RGBA{100, 150, 255, 100}, false)
+			vector.DrawFilledRect(screen, float32(centerX-195), highlightY, 320, 20, color.RGBA{173, 216, 230, 150}, false)
 		}
 
 		// Draw entry data
@@ -422,7 +466,32 @@ func (s *Scoreboard) drawLeaderboard(screen *ebiten.Image) {
 		ebitenutil.DebugPrintAt(screen, entry.SecondsLate, centerX+60, entryY)
 	}
 
-	// Instructions
+	// Draw separator and current race entry if it's outside top 10
+	if s.currentRaceEntry != nil {
+		separatorY := startY + 50 + (len(s.leaderboard) * 25) + 10
+
+		// Draw separator dots
+		ebitenutil.DebugPrintAt(screen, "...", centerX-10, separatorY)
+
+		// Draw current race entry
+		entryY := separatorY + 20
+
+		// Highlight current race with light blue background
+		highlightY := float32(entryY - 2)
+		vector.DrawFilledRect(screen, float32(centerX-195), highlightY, 320, 20, color.RGBA{173, 216, 230, 150}, false)
+
+		// Draw entry data
+		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("%d", s.currentRaceEntry.Rank), centerX-180, entryY)
+
+		// Truncate long names
+		displayName := s.currentRaceEntry.PlayerName
+		if len(displayName) > 12 {
+			displayName = displayName[:12] + "..."
+		}
+		ebitenutil.DebugPrintAt(screen, displayName, centerX-120, entryY)
+		ebitenutil.DebugPrintAt(screen, s.currentRaceEntry.RaceTime, centerX-20, entryY)
+		ebitenutil.DebugPrintAt(screen, s.currentRaceEntry.SecondsLate, centerX+60, entryY)
+	} // Instructions
 	var instructions string
 	if IsWASM() {
 		instructions = "Press ENTER or ESC to continue • Data saved online"
