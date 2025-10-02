@@ -18,21 +18,29 @@ type Telltales struct {
 	BaseY   float64 // Screen Y position (hinge point)
 	Angle   float64 // Telltale angle in degrees (0 = horizontal, negative = up, positive = down)
 	Visible bool    // Whether telltale should be shown (always true now)
+	// Wobble animation
+	elapsedTime float64 // Time elapsed for wobble animation
+	wobblePhase float64 // Phase offset for wobble (randomized)
 }
 
 // NewTelltales creates a new telltales instance
 func NewTelltales(screenWidth, screenHeight int) *Telltales {
 	return &Telltales{
-		Length:  75.0,
-		BaseX:   float64(screenWidth/2 - 50), // Left of center
-		BaseY:   80.0,                        // Below timer and OCS warning
-		Angle:   0.0,                         // Start horizontal
-		Visible: true,                        // Always visible now
+		Length:      75.0,
+		BaseX:       float64(screenWidth/2 - 50), // Left of center
+		BaseY:       80.0,                        // Below timer and OCS warning
+		Angle:       0.0,                         // Start horizontal
+		Visible:     true,                        // Always visible now
+		elapsedTime: 0.0,
+		wobblePhase: math.Pi * 0.3, // Slight phase offset for natural look
 	}
 }
 
 // Update calculates telltale position based on boat performance
 func (t *Telltales) Update(boat *objects.Boat, wind world.Wind, dashboard *dashboard.Dashboard) {
+	// Update animation time (assuming 60 FPS, so ~16.67ms per frame)
+	t.elapsedTime += 1.0 / 60.0
+
 	windDir, windSpeed := wind.GetWind(boat.Pos)
 	twa := boat.Heading - windDir
 
@@ -60,8 +68,8 @@ func (t *Telltales) Update(boat *objects.Boat, wind world.Wind, dashboard *dashb
 	// Calculate optimal TWA for current wind conditions and sailing mode
 	optimalTWA := t.findOptimalTWA(boat, windSpeed, absTWA)
 
-	// Calculate telltale angle based on VMG efficiency
-	t.calculateTelltaleAngle(absTWA, optimalTWA, efficiency)
+	// Calculate base telltale angle based on VMG efficiency
+	t.calculateTelltaleAngle(absTWA, optimalTWA, efficiency, windSpeed)
 }
 
 // findOptimalTWA finds the optimal TWA for current wind conditions using polars
@@ -100,45 +108,66 @@ func (t *Telltales) findOptimalTWA(boat *objects.Boat, windSpeed float64, absTWA
 	return bestTWA
 }
 
-// calculateTelltaleAngle determines telltale angle based on VMG efficiency
-func (t *Telltales) calculateTelltaleAngle(absTWA, optimalTWA, efficiency float64) {
-	// Reset angle
-	t.Angle = 0.0
+// calculateTelltaleAngle determines telltale angle based on VMG efficiency with natural wobble
+func (t *Telltales) calculateTelltaleAngle(absTWA, optimalTWA, efficiency, windSpeed float64) {
+	// Calculate base angle from VMG efficiency using aggressive response curve
+	baseAngle := 0.0
 
-	// If sailing very efficiently, keep telltale horizontal
+	// Clamp efficiency to reasonable range
+	efficiency = math.Max(0.0, math.Min(efficiency, 1.2)) // Allow slight over-efficiency
+
+	// Aggressive telltale deflection based on VMG efficiency
+	var deflectionAngle float64
+
 	if efficiency >= 0.95 {
-		return
+		// Very efficient sailing (95%+) - telltale nearly horizontal
+		deflectionAngle = 0.0
+	} else if efficiency >= 0.75 {
+		// Good sailing (75-95%) - linear interpolation from 0° to 45°
+		factor := (0.95 - efficiency) / (0.95 - 0.75) // 0 to 1 as efficiency drops from 95% to 75%
+		deflectionAngle = 45.0 * factor
+	} else if efficiency >= 0.50 {
+		// Poor sailing (50-75%) - steeper curve from 45° to 75°
+		factor := (0.75 - efficiency) / (0.75 - 0.50) // 0 to 1 as efficiency drops from 75% to 50%
+		deflectionAngle = 45.0 + 30.0*factor          // 45° to 75°
+	} else {
+		// Very poor sailing (below 50%) - nearly vertical at 85°
+		factor := math.Max(0.0, efficiency) / 0.50 // 0 to 1 as efficiency goes from 0% to 50%
+		deflectionAngle = 85.0 - 10.0*factor       // 85° down to 75°
 	}
 
-	// Maximum deflection angles
-	maxUpAngle := -45.0  // Maximum upward deflection (pinching)
-	maxDownAngle := 30.0 // Maximum downward deflection (footing)
-
-	// Calculate deflection based on difference from optimal TWA
+	// Determine direction based on sailing mode relative to optimal TWA
 	angleDiff := absTWA - optimalTWA
 
-	if angleDiff < 0 {
-		// Pinching (sailing higher than optimal) - telltale lifts up
-		deflectionFactor := math.Abs(angleDiff) / optimalTWA
-		deflectionFactor = math.Min(deflectionFactor, 1.0)
-
-		// Apply efficiency factor - less efficient = more deflection
-		efficiencyFactor := 1.0 - math.Min(efficiency, 1.0)
-		t.Angle = maxUpAngle * deflectionFactor * (0.5 + efficiencyFactor*0.5)
-	} else if angleDiff > 0 {
-		// Footing (sailing lower than optimal) - telltale drops down
-		maxAngleRange := 180.0 - optimalTWA // Available range to foot off
-		if maxAngleRange <= 0 {
-			maxAngleRange = 90.0 // Fallback
+	if math.Abs(angleDiff) < 2.0 {
+		// Very close to optimal - minimal deflection regardless of efficiency
+		sign := 1.0
+		if angleDiff < 0 {
+			sign = -1.0
 		}
-
-		deflectionFactor := angleDiff / maxAngleRange
-		deflectionFactor = math.Min(deflectionFactor, 1.0)
-
-		// Apply efficiency factor
-		efficiencyFactor := 1.0 - math.Min(efficiency, 1.0)
-		t.Angle = maxDownAngle * deflectionFactor * (0.5 + efficiencyFactor*0.5)
+		baseAngle = deflectionAngle * 0.2 * sign
+	} else if angleDiff < 0 {
+		// Pinching (sailing higher than optimal) - telltale lifts up (negative angle)
+		baseAngle = -deflectionAngle
+	} else {
+		// Footing (sailing lower than optimal) - telltale drops down (positive angle)
+		baseAngle = deflectionAngle * 0.7 // Slightly less dramatic for footing
 	}
+
+	// Add natural wobble animation
+	// Wobble frequency and amplitude based on wind speed and efficiency
+	wobbleFrequency := 2.0 + windSpeed*0.1                       // Higher wind = faster wobble
+	wobbleAmplitude := 3.0 + (1.0-math.Min(efficiency, 1.0))*2.0 // Less efficient = more wobble
+
+	// Create complex wobble with multiple sine waves for natural movement
+	wobbleAngle1 := math.Sin(t.elapsedTime*wobbleFrequency+t.wobblePhase) * wobbleAmplitude
+	wobbleAngle2 := math.Sin(t.elapsedTime*wobbleFrequency*1.7+t.wobblePhase*1.3) * wobbleAmplitude * 0.3
+	wobbleAngle3 := math.Sin(t.elapsedTime*wobbleFrequency*0.6+t.wobblePhase*0.7) * wobbleAmplitude * 0.5
+
+	totalWobble := wobbleAngle1 + wobbleAngle2 + wobbleAngle3
+
+	// Combine base angle with wobble
+	t.Angle = baseAngle + totalWobble
 }
 
 // Draw renders the single red telltale on screen
