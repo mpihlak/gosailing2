@@ -692,9 +692,10 @@ func (g *GameState) checkFinishLineCrossing() {
 	startLineY := 2400.0
 	bowPos := g.Boat.GetBowPosition()
 
-	// Check if bow crosses from north (course side) to south (finish side) AND is within line bounds
-	// Boat must be coming from course side (Y < lineY) and cross to finish side (Y >= lineY)
-	if bowPos.Y >= startLineY && g.isWithinLineBounds(bowPos) {
+	// Check if bow crosses the Y coordinate from above (prevBowPos.Y < startLineY) to below (bowPos.Y >= startLineY)
+	// AND the boat is within line bounds at the moment of crossing
+	// Boat must be coming from course side (north) and cross to finish side (south) while between pin and committee boat
+	if g.prevBowPos.Y < startLineY && bowPos.Y >= startLineY && g.isWithinLineBounds(bowPos) {
 		// Boat has finished the race!
 		g.raceFinished = true
 		g.finishTime = g.raceTimer
