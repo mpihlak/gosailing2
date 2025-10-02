@@ -39,6 +39,8 @@ type GameState struct {
 	lastPauseInput time.Time // Last time pause key was pressed
 	// Mobile controls
 	mobileControls *MobileControls
+	// Telltales for sailing feedback
+	telltales *Telltales
 	// Reusable images to avoid creating new ones every frame
 	worldImage *ebiten.Image
 	// Race start timer (elapsed time based for pause support)
@@ -146,6 +148,7 @@ func NewGame() *GameState {
 		CameraX:        cameraX,
 		CameraY:        cameraY,
 		mobileControls: NewMobileControls(ScreenWidth, ScreenHeight),
+		telltales:      NewTelltales(ScreenWidth, ScreenHeight),
 		worldImage:     ebiten.NewImage(WorldWidth, WorldHeight),
 		isPaused:       true,             // Start game in paused mode
 		timerDuration:  30 * time.Second, // Race starts after 30 seconds
@@ -361,6 +364,9 @@ func (g *GameState) Update() error {
 
 	g.Boat.Update()
 
+	// Update telltales based on current boat performance
+	g.telltales.Update(g.Boat, g.Wind, g.Dashboard)
+
 	// Update camera to follow boat when it moves out of bounds
 	g.updateCamera()
 
@@ -421,6 +427,9 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 
 	// Draw OCS warning below timer
 	g.drawOCSWarning(screen)
+
+	// Draw telltales (only visible when sailing upwind)
+	g.telltales.Draw(screen)
 
 	// Draw mobile controls (only visible on touch devices)
 	g.mobileControls.Draw(screen, g.isPaused)
