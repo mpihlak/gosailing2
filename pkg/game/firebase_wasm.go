@@ -59,15 +59,18 @@ func (fc *FirebaseClient) SubmitScore(result *RaceResult, callback func(bool, st
 	// Submit to Firestore collection "race_results"
 	collection := fc.firestore.Call("collection", "race_results")
 
-	// Create success callback
-	successCallback := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+	// Create success callback - don't use defer, release manually in callback
+	var successCallback js.Func
+	successCallback = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		defer successCallback.Release() // Release when callback is actually called
 		callback(true, "")
 		return nil
 	})
-	defer successCallback.Release()
 
-	// Create error callback
-	errorCallback := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+	// Create error callback - don't use defer, release manually in callback
+	var errorCallback js.Func
+	errorCallback = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		defer errorCallback.Release() // Release when callback is actually called
 		errorMsg := "Failed to submit score"
 		if len(args) > 0 && !args[0].IsUndefined() {
 			if message := args[0].Get("message"); !message.IsUndefined() {
@@ -77,7 +80,6 @@ func (fc *FirebaseClient) SubmitScore(result *RaceResult, callback func(bool, st
 		callback(false, errorMsg)
 		return nil
 	})
-	defer errorCallback.Release()
 
 	// Add document
 	promise := collection.Call("add", jsData)
@@ -102,8 +104,10 @@ func (fc *FirebaseClient) GetLeaderboard(callback func([]RaceResult, string)) {
 	query = query.Call("orderBy", "race_time_seconds", "asc")
 	query = query.Call("limit", 50)
 
-	// Create success callback
-	successCallback := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+	// Create success callback - don't use defer, release manually in callback
+	var successCallback js.Func
+	successCallback = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		defer successCallback.Release() // Release when callback is actually called
 		if len(args) == 0 {
 			callback(nil, "No data received")
 			return nil
@@ -136,10 +140,11 @@ func (fc *FirebaseClient) GetLeaderboard(callback func([]RaceResult, string)) {
 		callback(results, "")
 		return nil
 	})
-	defer successCallback.Release()
 
-	// Create error callback
-	errorCallback := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+	// Create error callback - don't use defer, release manually in callback
+	var errorCallback js.Func
+	errorCallback = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		defer errorCallback.Release() // Release when callback is actually called
 		errorMsg := "Failed to load leaderboard"
 		if len(args) > 0 && !args[0].IsUndefined() {
 			if message := args[0].Get("message"); !message.IsUndefined() {
@@ -149,7 +154,6 @@ func (fc *FirebaseClient) GetLeaderboard(callback func([]RaceResult, string)) {
 		callback(nil, errorMsg)
 		return nil
 	})
-	defer errorCallback.Release()
 
 	// Execute query
 	promise := query.Call("get")
