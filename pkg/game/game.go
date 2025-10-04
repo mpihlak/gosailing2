@@ -28,6 +28,20 @@ const (
 	inputDelay     = 0 * time.Millisecond // Delay between keystroke readings
 )
 
+// CourseType selects which course layout to use
+type CourseType int
+
+const (
+	CourseWindwardFinish CourseType = iota
+	CourseKJKInshore
+)
+
+// Display names for courses
+const (
+	CourseNameExisting = "Windward-Finish"
+	CourseNameKJK      = "KJK InShore W/L"
+)
+
 type GameState struct {
 	Boat           *objects.Boat
 	Arena          *world.Arena
@@ -90,9 +104,30 @@ type GameState struct {
 	averageSpeed       float64        // Average speed over the race (knots)
 	speedSum           float64        // Sum of boat speeds for calculating average
 	speedSamples       int            // Number of speed samples taken
+	// Course configuration
+	CourseType CourseType
+	CourseLeg  int // Current leg index for multi-leg courses (Olympic)
+	// Olympic-specific flags
+	spreaderLeft bool // Whether boat has passed to left of spreader mark (port)
+	spreaderLeft2 bool // Whether boat passed spreader to port on second visit
+	// Whether the course marking requirements were completed (for scoreboard)
+	courseCompleted bool
+	// Gate passage tracking for Olympic course
+	gatePassedBetween bool // Passed between gate marks
+	gateExitedSide    int  // -1 left, 1 right, 0 none
+	gateRoundChosen int  // -1 left, 1 right, 0 none
+	gateRounded     bool // Whether chosen gate buoy has been rounded
+	gateRoundPhase1 bool
+	gateRoundPhase2 bool
+	gateRoundPhase3 bool
 }
 
 func NewGame() *GameState {
+	return NewGameWithCourse(CourseWindwardFinish)
+}
+
+// NewGameWithCourse creates a new game state using the requested course layout
+func NewGameWithCourse(course CourseType) *GameState {
 	// 50:50 chance for which side has stronger wind
 	var leftSpeed, rightSpeed float64
 	if rand.Float32() < 0.5 {
@@ -104,7 +139,6 @@ func NewGame() *GameState {
 		leftSpeed = 8   // 8 kts on left side
 		rightSpeed = 14 // 14 kts on right side
 	}
-
 	wind := world.NewOscillatingWind(
 		leftSpeed,  // Variable wind speed on left side
 		rightSpeed, // Variable wind speed on right side
@@ -112,11 +146,14 @@ func NewGame() *GameState {
 	)
 
 	// Position starting line in center of world, optimized for 720p view
-	// Starting line at Y = 2400, shorter line (400m instead of 600m)
-	// Upwind mark positioned to be immediately visible at top of screen
-	pinX := float64(WorldWidth/2 - 200)       // Pin end (left) - shorter line
-	committeeX := float64(WorldWidth/2 + 200) // Committee end (right) - shorter line
-	lineY := float64(2400)                    // Positioned to accommodate upwind mark
+	// Starting line length = 0.2 nm (~370.4 m), centered horizontally
+	startLength := 0.2 * 1852.0 // 0.2 nautical miles in meters (1 nm = 1852 m)
+	halfStart := startLength / 2.0
+	centerX := float64(WorldWidth) / 2.0
+	pinX := centerX - halfStart
+	// Committee boat in the middle visually
+	committeeX := centerX
+	lineY := float64(2400) // Positioned to accommodate upwind mark
 
 	// Boat starts 180 meters below middle of line, sailing parallel to line towards committee boat
 	boatStartX := (pinX + committeeX) / 2 // Middle of the starting line
@@ -151,19 +188,42 @@ func NewGame() *GameState {
 	upwindMarkX := (pinX + committeeX) / 2             // Center of starting line
 	upwindMarkY := lineY - float64(ScreenHeight) + 100 // Visible at top of screen with margin
 
-	arena := &world.Arena{
-		Marks: []*world.Mark{
-			{Pos: geometry.Point{X: pinX, Y: lineY}, Name: "Pin"},
-			{Pos: geometry.Point{X: committeeX, Y: lineY}, Name: "Committee"},
-			{Pos: geometry.Point{X: upwindMarkX, Y: upwindMarkY}, Name: "Upwind"},
-		},
+	// Build arena depending on course type
+	var marks []*world.Mark
+	// Common start line marks: Pin (left), Committee (middle)
+	marks = append(marks, &world.Mark{Pos: geometry.Point{X: pinX, Y: lineY}, Name: "Pin"})
+	marks = append(marks, &world.Mark{Pos: geometry.Point{X: committeeX, Y: lineY}, Name: "Committee"})
+
+	// Upwind mark (used in both courses)
+	marks = append(marks, &world.Mark{Pos: geometry.Point{X: upwindMarkX, Y: upwindMarkY}, Name: "Upwind"})
+
+	if course == CourseKJKInshore {
+		// Add spreader mark 0.1 nm (~185.2 m) to the left of windward mark
+		spreaderOffset := 185.2
+		marks = append(marks, &world.Mark{Pos: geometry.Point{X: upwindMarkX - spreaderOffset, Y: upwindMarkY}, Name: "Spreader"})
+
+		// Add leeward gate as two marks positioned between upwind and starting line
+		gateY := (upwindMarkY + lineY) / 2
+		gateOffset := 60.0 // horizontal separation for gate marks
+		marks = append(marks, &world.Mark{Pos: geometry.Point{X: upwindMarkX - gateOffset, Y: gateY}, Name: "GateLeft"})
+		marks = append(marks, &world.Mark{Pos: geometry.Point{X: upwindMarkX + gateOffset, Y: gateY}, Name: "GateRight"})
 	}
+
+	// Add finish line: left endpoint is the Committee mark, length = 1/3 of start
+	finishLength := startLength / 3.0
+	finishStartX := committeeX
+	finishEndX := finishStartX + finishLength
+	marks = append(marks, &world.Mark{Pos: geometry.Point{X: finishEndX, Y: lineY}, Name: "FinishEnd"})
+
+	arena := &world.Arena{Marks: marks}
 	dash := &dashboard.Dashboard{
 		Boat:       boat,
 		Wind:       wind,
 		StartTime:  time.Now().Add(5 * time.Minute),
-		LineStart:  geometry.Point{X: pinX, Y: lineY},              // Pin end
-		LineEnd:    geometry.Point{X: committeeX, Y: lineY},        // Committee end
+	LineStart:      geometry.Point{X: pinX, Y: lineY},          // Pin end
+	LineEnd:        geometry.Point{X: committeeX, Y: lineY},    // Committee end as rightmost start mark
+	FinishLineStart: geometry.Point{X: committeeX, Y: lineY},   // Finish left (Committee)
+	FinishLineEnd:   geometry.Point{X: finishEndX, Y: lineY},   // Finish right (blue flag)
 		UpwindMark: geometry.Point{X: upwindMarkX, Y: upwindMarkY}, // Upwind mark
 	}
 
@@ -171,13 +231,16 @@ func NewGame() *GameState {
 	cameraX := (pinX+committeeX)/2 - float64(ScreenWidth)/2 // Center line horizontally
 	cameraY := lineY - float64(ScreenHeight)/2 + 50         // Show line and upwind mark
 
-	return &GameState{
+	// Initialize GameState
+	gs := &GameState{
 		Boat:           boat,
 		Arena:          arena,
 		Wind:           wind,
 		Dashboard:      dash,
 		CameraX:        cameraX,
 		CameraY:        cameraY,
+		CourseType:     course,
+		CourseLeg:      0,
 		mobileControls: NewMobileControls(ScreenWidth, ScreenHeight),
 		telltales:      NewTelltales(ScreenWidth, ScreenHeight),
 		scoreboard:     NewScoreboard(),
@@ -203,6 +266,15 @@ func NewGame() *GameState {
 		showRestartBanner: false,
 		restartBannerTime: time.Time{},
 	}
+
+	return gs
+}
+
+// distance returns Euclidean distance between two points
+func distance(x1, y1, x2, y2 float64) float64 {
+	dx := x2 - x1
+	dy := y2 - y1
+	return math.Sqrt(dx*dx + dy*dy)
 }
 
 func (g *GameState) Update() error {
@@ -234,13 +306,27 @@ func (g *GameState) Update() error {
 
 		// Handle restart key (keyboard or mobile)
 		if inpututil.IsKeyJustPressed(ebiten.KeyR) || mobileInput.RestartPressed {
-			newGame := NewGame()
+			newGame := NewGameWithCourse(g.CourseType)
 			*g = *newGame
 			// Unpause and show restart banner
 			g.isPaused = false
 			g.showRestartBanner = true
 			g.restartBannerTime = time.Now()
 			return nil
+		}
+
+	// Course selection: 1 = windward-finish, 2 = KJK InShore (only when paused)
+		if g.isPaused {
+			if inpututil.IsKeyJustPressed(ebiten.Key1) {
+				newGame := NewGameWithCourse(CourseWindwardFinish)
+				*g = *newGame
+				return nil
+			}
+			if inpututil.IsKeyJustPressed(ebiten.Key2) {
+				newGame := NewGameWithCourse(CourseKJKInshore)
+				*g = *newGame
+				return nil
+			}
 		}
 
 		// Handle 'J' key to jump timer forward by 10 seconds (only before race starts)
@@ -394,9 +480,13 @@ func (g *GameState) Update() error {
 			g.updateMarkRounding()
 		}
 
-		// Finish line detection (only if boat has started and rounded the mark)
-		if g.hasCrossedLine && g.markRounded && !g.raceFinished {
-			g.checkFinishLineCrossing()
+		// Finish line detection:
+		// - For non-KJK courses, require markRounded before finish
+		// - For KJK InShore course, allow finish when CourseLeg == 4 (finish leg)
+		if g.hasCrossedLine && !g.raceFinished {
+			if g.markRounded || (g.CourseType == CourseKJKInshore && g.CourseLeg == 4) {
+				g.checkFinishLineCrossing()
+			}
 		}
 	}
 
@@ -513,7 +603,12 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	screen.DrawImage(g.worldImage, op)
 
 	// Draw dashboard directly to screen (UI always visible)
-	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.timerDuration, g.elapsedTime, g.hasCrossedLine, g.secondsLate, g.speedPercentage, g.markRounded, g.raceFinished, g.distanceToLineCrossing, g.timeToCross, g.penaltyCount, g.distanceSailed)
+	// Prepare course name for HUD
+	courseName := CourseNameExisting
+	if g.CourseType == CourseKJKInshore {
+		courseName = CourseNameKJK
+	}
+	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.timerDuration, g.elapsedTime, g.hasCrossedLine, g.secondsLate, g.speedPercentage, g.markRounded, g.raceFinished, g.distanceToLineCrossing, g.timeToCross, g.penaltyCount, g.distanceSailed, courseName, g.CourseLeg, g.courseCompleted, g.gatePassedBetween, g.gateRoundChosen, g.gateRounded)
 
 	// Draw race timer at top center (when race hasn't started)
 	g.drawRaceTimer(screen)
@@ -571,7 +666,7 @@ func (g *GameState) drawHelpScreen(screen *ebiten.Image) {
 	// Check if we're on mobile (touch input detected)
 	if g.mobileControls.hasTouchInput {
 		// Mobile help text - focus on game explanation, not controls
-		helpText = `Go Sailing! - PAUSED
+	helpText = `Go Sailing! - PAUSED
 
 How to Play:
 * Start racing when the timer reaches zero
@@ -582,6 +677,10 @@ How to Play:
 * Use wind angles for optimal speed
 
 Use Touch Controls to turn left/right, pause or restart.
+
+Course selection (while paused):
+1 - Windward-Finish course
+2 - KJK InShore W/L course (windward, gate, windward, finish)
 
 Tap anywhere to continue...`
 	} else {
@@ -610,6 +709,8 @@ Controls:
   J               - Jump Timer +10 sec (pre start)
   R               - Restart Game
   C               - Toggle Touch Controls (testing)
+  1               - Select Windward-Finish course (while paused)
+  2               - Select KJK InShore W/L course (while paused)
 %s  Q               - %s
 
 Press SPACE to continue...`, leaderboardLine, quitText)
@@ -899,83 +1000,204 @@ func (g *GameState) calculateTimeToCross() float64 {
 
 // updateMarkRounding tracks the three phases of mark rounding
 func (g *GameState) updateMarkRounding() {
-	// Get upwind mark position (it's the third mark in the arena)
-	if len(g.Arena.Marks) < 3 {
-		return
-	}
+	boatPos := g.Boat.Pos
+	bowPos := g.Boat.GetBowPosition()
+	// Course-aware mark rounding
+	if g.CourseType == CourseWindwardFinish {
+		// Existing single-upwind mark rounding logic
+		// Get upwind mark position (it's the third mark in the arena)
+		if len(g.Arena.Marks) < 3 {
+			return
+		}
 	upwindMark := g.Arena.Marks[2] // Upwind mark
 
-	boatPos := g.Boat.Pos
-
-	// Phase 1: Sailed past mark (south to north of mark)
-	if !g.markRoundingPhase1 {
-		// Check if boat has moved from south (Y > markY) to north (Y < markY) of mark
-		// We use a 1 unit difference as specified
-		if boatPos.Y <= upwindMark.Pos.Y-1 {
-			g.markRoundingPhase1 = true
-		}
-	}
-
-	// Phase 2: Travelled to left (east to west while north of mark)
-	if g.markRoundingPhase1 && !g.markRoundingPhase2 {
-		// Only check this phase while boat is north of the mark
-		if boatPos.Y < upwindMark.Pos.Y {
-			// Check if boat has moved from east (X > markX) to west (X < markX) of mark
-			if boatPos.X <= upwindMark.Pos.X-1 {
-				g.markRoundingPhase2 = true
+		// Phase 1: Sailed past mark (south to north of mark)
+		if !g.markRoundingPhase1 {
+			if boatPos.Y <= upwindMark.Pos.Y-1 {
+				g.markRoundingPhase1 = true
 			}
-		} else {
-			// If boat moves back south of mark before completing phase 2, reset phase 2
-			// but keep phase 1 completed
-			g.markRoundingPhase2 = false
 		}
+
+		// Phase 2: Travelled to left (east to west while north of mark)
+		if g.markRoundingPhase1 && !g.markRoundingPhase2 {
+			if boatPos.Y < upwindMark.Pos.Y {
+				if boatPos.X <= upwindMark.Pos.X-1 {
+					g.markRoundingPhase2 = true
+				}
+			} else {
+				g.markRoundingPhase2 = false
+			}
+		}
+
+		// Phase 3: Sailed below mark (north to south of mark)
+		if g.markRoundingPhase1 && g.markRoundingPhase2 && !g.markRoundingPhase3 {
+			if boatPos.Y >= upwindMark.Pos.Y+1 {
+				g.markRoundingPhase3 = true
+				g.markRounded = true // All phases complete
+			}
+		}
+
+		// Reset phase 2 if boat drifts back to east while still north of mark
+		if g.markRoundingPhase2 && !g.markRoundingPhase3 && g.Boat.Pos.Y < upwindMark.Pos.Y {
+			if g.Boat.Pos.X > upwindMark.Pos.X {
+				g.markRoundingPhase2 = false
+			}
+		}
+		return
 	}
 
-	// Phase 3: Sailed below mark (north to south of mark)
-	if g.markRoundingPhase1 && g.markRoundingPhase2 && !g.markRoundingPhase3 {
-		// Check if boat has moved from north (Y < markY) to south (Y > markY) of mark
-		if boatPos.Y >= upwindMark.Pos.Y+1 {
-			g.markRoundingPhase3 = true
-			g.markRounded = true // All phases complete
-		}
-	}
+	// KJK InShore course progression: legs
+	// Leg 0: round upwind mark (leave to port)
+	// Leg 1: pass spreader to port
+	// Leg 2: pass through leeward gate (between GateLeft and GateRight)
+	// Leg 3: round upwind and pass spreader to port again
+	// Leg 4: finish (handled elsewhere by finish line crossing)
 
-	// Reset phase 2 if boat drifts back to east while still north of mark
-	if g.markRoundingPhase2 && !g.markRoundingPhase3 && boatPos.Y < upwindMark.Pos.Y {
-		if boatPos.X > upwindMark.Pos.X {
-			g.markRoundingPhase2 = false
+	// Require at least 6 marks for KJK InShore (Pin, Committee, Upwind, Spreader, GateLeft, GateRight)
+	if len(g.Arena.Marks) < 6 {
+		return
+	}
+	upwind := g.Arena.Marks[2]
+	spreader := g.Arena.Marks[3]
+	gateLeft := g.Arena.Marks[4]
+	gateRight := g.Arena.Marks[5]
+
+	switch g.CourseLeg {
+	case 0:
+		// First upwind rounding (leave to port)
+		if !g.markRoundingPhase1 {
+			if boatPos.Y <= upwind.Pos.Y-1 {
+				g.markRoundingPhase1 = true
+			}
 		}
+		if g.markRoundingPhase1 && !g.markRoundingPhase2 {
+			if boatPos.Y < upwind.Pos.Y {
+				if boatPos.X <= upwind.Pos.X-1 {
+					g.markRoundingPhase2 = true
+				}
+			} else {
+				g.markRoundingPhase2 = false
+			}
+		}
+		if g.markRoundingPhase1 && g.markRoundingPhase2 && !g.markRoundingPhase3 {
+			if boatPos.Y >= upwind.Pos.Y+1 {
+				g.markRoundingPhase3 = true
+				g.markRounded = true
+			}
+		}
+		if g.markRounded {
+			g.CourseLeg = 1
+			g.markRoundingPhase1 = false
+			g.markRoundingPhase2 = false
+			g.markRoundingPhase3 = false
+			g.markRounded = false
+		}
+
+	case 1:
+		// Spreader passage: boat must pass to port (left) of spreader
+		if !g.spreaderLeft {
+			if boatPos.X <= spreader.Pos.X-1 {
+				g.spreaderLeft = true
+				g.CourseLeg = 2
+			}
+		}
+
+	case 2:
+		// Gate passage: must pass BETWEEN gate marks and then choose a buoy to round (left or right)
+		gateMinX := math.Min(gateLeft.Pos.X, gateRight.Pos.X)
+		gateMaxX := math.Max(gateLeft.Pos.X, gateRight.Pos.X)
+		// Step 1: detect passing between marks (north->south)
+		if !g.gatePassedBetween {
+			if g.prevBowPos.Y < gateLeft.Pos.Y && bowPos.Y >= gateLeft.Pos.Y && bowPos.X >= gateMinX && bowPos.X <= gateMaxX {
+				// Boat has passed between the gate marks - count as taken and advance
+				g.gatePassedBetween = true
+				g.gateRounded = true
+				g.CourseLeg = 3
+				// reset any previous round state
+				g.gateRoundChosen = 0
+				g.gateRoundPhase1 = false
+				g.gateRoundPhase2 = false
+				g.gateRoundPhase3 = false
+			}
+			return
+		}
+		// We already advanced to next leg above, nothing more to do here.
+
+	case 3:
+		// Second upwind rounding and require passing spreader to port again
+		if !g.markRoundingPhase1 {
+			if boatPos.Y <= upwind.Pos.Y-1 {
+				g.markRoundingPhase1 = true
+			}
+		}
+		if g.markRoundingPhase1 && !g.markRoundingPhase2 {
+			if boatPos.Y < upwind.Pos.Y {
+				if boatPos.X <= upwind.Pos.X-1 {
+					g.markRoundingPhase2 = true
+				}
+			} else {
+				g.markRoundingPhase2 = false
+			}
+		}
+		if g.markRoundingPhase1 && g.markRoundingPhase2 && !g.markRoundingPhase3 {
+			if boatPos.Y >= upwind.Pos.Y+1 {
+				g.markRoundingPhase3 = true
+				g.markRounded = true
+			}
+		}
+		// Track second spreader pass
+		if !g.spreaderLeft2 && boatPos.X <= spreader.Pos.X-1 {
+			g.spreaderLeft2 = true
+		}
+		if g.markRounded && g.spreaderLeft2 {
+			g.CourseLeg = 4
+			g.markRounded = false
+		}
+
+	default:
+		// other legs/do nothing
 	}
 }
 
 // checkFinishLineCrossing detects when boat crosses finish line from course side
 func (g *GameState) checkFinishLineCrossing() {
-	// Finish line is same as starting line
-	startLineY := 2400.0
+	// Use the dashboard's finish line endpoints
 	bowPos := g.Boat.GetBowPosition()
+	finishStart := g.Dashboard.FinishLineStart
+	finishEnd := g.Dashboard.FinishLineEnd
 
-	// Check if bow crosses the Y coordinate from above (prevBowPos.Y < startLineY) to below (bowPos.Y >= startLineY)
-	// AND the boat is within line bounds at the moment of crossing
-	// Boat must be coming from course side (north) and cross to finish side (south) while between pin and committee boat
-	if g.prevBowPos.Y < startLineY && bowPos.Y >= startLineY && g.isWithinLineBounds(bowPos) {
-		// Boat has finished the race!
-		g.raceFinished = true
-		g.finishTime = g.raceTimer
-		g.showFinishBanner = true
-		g.finishBannerTime = time.Now()
+	// Only allow finish for KJK InShore when on leg 4
+	if g.CourseType == CourseKJKInshore && g.CourseLeg != 4 {
+		return
+	}
 
-		// Calculate average speed from running average of boat speed
-		if g.speedSamples > 0 {
-			g.averageSpeed = g.speedSum / float64(g.speedSamples)
-		}
+	// Check if bow crosses the finish line Y coordinate from above to below and is within finish bounds
+	if g.prevBowPos.Y < finishStart.Y && bowPos.Y >= finishStart.Y {
+		// Check X between finishStart and finishEnd
+		minX := math.Min(finishStart.X, finishEnd.X)
+		maxX := math.Max(finishStart.X, finishEnd.X)
+		if bowPos.X >= minX && bowPos.X <= maxX {
+            // Boat has finished the race!
+            g.raceFinished = true
+            g.finishTime = g.raceTimer
+            g.showFinishBanner = true
+            g.finishBannerTime = time.Now()
+            // Mark course as completed when finish conditions met
+            g.courseCompleted = true
 
-		// Show scoreboard after a short delay (let finish banner show first)
-		go func() {
-			time.Sleep(3 * time.Second)
-			if g.raceFinished && !g.scoreboard.IsVisible() {
-				g.showScoreboard()
+			// Calculate average speed from running average of boat speed
+			if g.speedSamples > 0 {
+				g.averageSpeed = g.speedSum / float64(g.speedSamples)
 			}
-		}()
+
+            // Show scoreboard after a short delay (let finish banner show first)
+            go func() {
+                time.Sleep(3 * time.Second)
+                if g.raceFinished && !g.scoreboard.IsVisible() {
+                    g.showScoreboard()
+                }
+            }()
+		}
 	}
 }
 
@@ -992,7 +1214,7 @@ func (g *GameState) showScoreboard() {
 		RaceTimeSeconds: g.finishTime.Seconds(),
 		SecondsLate:     g.secondsLate,
 		SpeedPercentage: g.speedPercentage,
-		MarkRounded:     g.markRounded,
+		MarkRounded:     g.courseCompleted || g.markRounded,
 		DistanceSailed:  g.distanceSailed,
 		AverageSpeed:    g.averageSpeed,
 		Timestamp:       time.Now(),

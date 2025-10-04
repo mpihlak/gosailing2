@@ -18,6 +18,9 @@ type Dashboard struct {
 	StartTime  time.Time
 	LineStart  geometry.Point // Pin end of starting line
 	LineEnd    geometry.Point // Committee end of starting line
+	// Finish line endpoints (left and right)
+	FinishLineStart geometry.Point
+	FinishLineEnd   geometry.Point
 	UpwindMark geometry.Point // Upwind mark position
 }
 
@@ -106,7 +109,7 @@ func (d *Dashboard) FindBestVMG() float64 {
 	return bestVMG
 }
 
-func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, timerDuration time.Duration, elapsedTime time.Duration, hasCrossedLine bool, secondsLate float64, speedPercentage float64, markRounded bool, raceFinished bool, distanceToLineCrossing float64, timeToCross float64, penaltyCount int, distanceSailed float64) {
+func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, timerDuration time.Duration, elapsedTime time.Duration, hasCrossedLine bool, secondsLate float64, speedPercentage float64, markRounded bool, raceFinished bool, distanceToLineCrossing float64, timeToCross float64, penaltyCount int, distanceSailed float64, courseName string, courseLeg int, courseCompleted bool, gatePassed bool, gateChoice int, gateRounded bool) {
 	windDir, windSpeed := d.Wind.GetWind(d.Boat.Pos)
 	twa := d.Boat.Heading - windDir
 	if twa < -180 {
@@ -169,5 +172,17 @@ func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, tim
 		msg += fmt.Sprintf("\nPenalties: %d", penaltyCount)
 	}
 
-	ebitenutil.DebugPrintAt(screen, msg, screen.Bounds().Dx()-150, 10)
+	// Show course/leg HUD
+	if courseName != "" {
+		legInfo := fmt.Sprintf("Course: %s (Leg %d)", courseName, courseLeg)
+		if courseCompleted {
+			legInfo += " - Completed"
+		}
+		msg += "\n" + legInfo
+
+		// (Gate debug info removed)
+	}
+
+	// Left-align HUD text so it fits on screen
+	ebitenutil.DebugPrintAt(screen, msg, 10, 10)
 }

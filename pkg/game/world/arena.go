@@ -60,7 +60,38 @@ func (m *Mark) Draw(screen *ebiten.Image) {
 		// Mark base (small circle)
 		ebitenutil.DrawRect(screen, m.Pos.X-2, m.Pos.Y-2, 4, 4, color.RGBA{255, 165, 0, 255}) // Orange base
 	} else {
+		// Draw spreader as yellow if present
+		if m.Name == "Spreader" {
+			// Yellow flag/pin for spreader
+			ebitenutil.DrawLine(screen, m.Pos.X, m.Pos.Y-10, m.Pos.X, m.Pos.Y+5, color.RGBA{139, 69, 19, 255})
+			flagColor := color.RGBA{255, 255, 0, 255} // Yellow
+			for i := 0; i < 6; i++ {
+				ebitenutil.DrawLine(screen, m.Pos.X, m.Pos.Y-10+float64(i), m.Pos.X+8-float64(i), m.Pos.Y-10+float64(i), flagColor)
+			}
+			ebitenutil.DrawRect(screen, m.Pos.X-2, m.Pos.Y-2, 4, 4, color.RGBA{255, 255, 0, 255})
+			return
+		}
+
+		// Draw gate marks specially if named accordingly
+		if m.Name == "GateLeft" || m.Name == "GateRight" {
+			// Draw gate as cyan circle
+			ebitenutil.DrawRect(screen, m.Pos.X-3, m.Pos.Y-3, 6, 6, color.RGBA{0, 255, 255, 255})
+			return
+		}
+
 		// Draw regular mark (committee boat)
+		// If this is the finish end, draw a blue flag
+		if m.Name == "FinishEnd" {
+			// Blue flag/pin for finish rightmost
+			ebitenutil.DrawLine(screen, m.Pos.X, m.Pos.Y-10, m.Pos.X, m.Pos.Y+5, color.RGBA{139, 69, 19, 255})
+			flagColor := color.RGBA{0, 0, 255, 255} // Blue
+			for i := 0; i < 6; i++ {
+				ebitenutil.DrawLine(screen, m.Pos.X, m.Pos.Y-10+float64(i), m.Pos.X+8-float64(i), m.Pos.Y-10+float64(i), flagColor)
+			}
+			ebitenutil.DrawRect(screen, m.Pos.X-2, m.Pos.Y-2, 4, 4, color.RGBA{0, 0, 255, 255})
+			return
+		}
+
 		ebitenutil.DrawRect(screen, m.Pos.X-5, m.Pos.Y-5, 10, 10, color.RGBA{255, 0, 0, 255})
 	}
 }
@@ -93,6 +124,17 @@ func (a *Arena) CheckCollisions(boatPos geometry.Point, boatRadius float64) []Co
 	}
 
 	return collisions
+}
+
+// FindMark returns the first mark with the given name, or nil if not found
+func (a *Arena) FindMark(name string) *Mark {
+	for _, m := range a.Marks {
+		if m.Name == name {
+			return m
+		}
+	}
+	return nil
+}
 }
 
 // drawDottedLine draws a dotted line between two points
@@ -190,11 +232,11 @@ func (a *Arena) drawWindBarb(screen *ebiten.Image, x, y float64, windDir, windSp
 
 // drawLaylines draws the starboard and port laylines for the upwind mark
 func (a *Arena) drawLaylines(screen *ebiten.Image) {
-	// Find upwind mark (third mark in the array)
-	if len(a.Marks) < 3 {
+	// Find upwind mark by name for robustness
+	upwindMark := a.FindMark("Upwind")
+	if upwindMark == nil {
 		return
 	}
-	upwindMark := a.Marks[2]
 
 	// Wind is from North (0 degrees), laylines show the close-hauled approach paths to the mark
 	// Since positive Y is down (toward starting line), we want laylines extending in positive Y direction
@@ -251,11 +293,10 @@ func (a *Arena) Draw(screen *ebiten.Image, raceStarted bool, wind Wind) {
 		a.drawWindIndicators(screen, wind)
 	}
 
-	// Draw starting line if we have exactly 2 marks (Pin and Committee)
-	if len(a.Marks) == 2 {
-		pin := a.Marks[0]
-		committee := a.Marks[1]
-
+	// Draw starting line. Expected marks: Pin (left) and Committee (right)
+	pin := a.FindMark("Pin")
+	committee := a.FindMark("Committee")
+	if pin != nil && committee != nil {
 		// Choose line color based on race state
 		var lineColor color.Color
 		if raceStarted {
@@ -263,17 +304,28 @@ func (a *Arena) Draw(screen *ebiten.Image, raceStarted bool, wind Wind) {
 		} else {
 			lineColor = color.RGBA{255, 255, 255, 255} // White before start
 		}
-
-		// Draw dotted line
 		a.drawDottedLine(screen, pin.Pos.X, pin.Pos.Y, committee.Pos.X, committee.Pos.Y, lineColor)
 	}
 
 	// Draw laylines for upwind mark (if we have 3 marks including upwind)
-	if len(a.Marks) >= 3 {
-		a.drawLaylines(screen)
+	a.drawLaylines(screen)
+
+	// Draw dotted gate line if gate marks exist
+	gateLeft := a.FindMark("GateLeft")
+	gateRight := a.FindMark("GateRight")
+	if gateLeft != nil && gateRight != nil {
+		gateColor := color.RGBA{255, 255, 0, 160} // Semi-transparent yellow
+		a.drawDottedLine(screen, gateLeft.Pos.X, gateLeft.Pos.Y, gateRight.Pos.X, gateRight.Pos.Y, gateColor)
 	}
 
-	// Draw marks
+	// Draw finish line (Committee -> FinishEnd) if FinishEnd exists
+	finishEnd := a.FindMark("FinishEnd")
+	if committee != nil && finishEnd != nil {
+		finishColor := color.RGBA{0, 0, 255, 200} // Blue finish line
+		a.drawDottedLine(screen, committee.Pos.X, committee.Pos.Y, finishEnd.Pos.X, finishEnd.Pos.Y, finishColor)
+	}
+
+	// Draw all marks
 	for _, mark := range a.Marks {
 		mark.Draw(screen)
 	}
