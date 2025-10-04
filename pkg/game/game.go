@@ -462,6 +462,9 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	// Draw OCS warning below timer
 	g.drawOCSWarning(screen)
 
+	// Draw timing bar (early/late indicator during pre-start)
+	g.drawTimingBar(screen)
+
 	// Draw telltales (only visible when sailing upwind and race has started)
 	if g.raceStarted {
 		g.telltales.Draw(screen)
@@ -668,6 +671,69 @@ func (g *GameState) drawOCSWarning(screen *ebiten.Image) {
 
 	// Draw white text on red background
 	ebitenutil.DebugPrintAt(screen, "*** OCS ***", ocsX, ocsY)
+}
+
+// drawTimingBar displays a horizontal bar showing if the boat is early (left) or late (right) for the start
+func (g *GameState) drawTimingBar(screen *ebiten.Image) {
+	// Only show during pre-start and when not OCS
+	if g.raceStarted || g.isOCS {
+		return
+	}
+
+	bounds := screen.Bounds()
+	centerX := bounds.Dx() / 2
+	barY := 70 // Position below OCS warning
+
+	// Calculate early/late timing
+	// Negative = early (will arrive before start), Positive = late (will arrive after start)
+	var timingDiff float64
+	if math.IsInf(g.timeToCross, 1) {
+		// Not crossing the line - show max late
+		timingDiff = 10.0 // Max late
+	} else {
+		// Time to cross - countdown remaining
+		remaining := (g.timerDuration - g.elapsedTime).Seconds()
+		timingDiff = g.timeToCross - remaining
+	}
+
+	// Scale to pixels: ±10 seconds = 40 pixels max
+	barExtension := timingDiff * 4.0 // 4 pixels per second
+	if barExtension < -40 {
+		barExtension = -40
+	} else if barExtension > 40 {
+		barExtension = 40
+	}
+
+	// Draw center point indicator (perfect timing line)
+	centerLineHeight := 10
+	centerLine := ebiten.NewImage(2, centerLineHeight)
+	centerLine.Fill(color.RGBA{255, 255, 255, 255}) // White
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Translate(float64(centerX-1), float64(barY-2)) // Center it, extend above bar
+	screen.DrawImage(centerLine, op)
+
+	// Draw the timing bar
+	barHeight := 5
+	var barWidth int
+	var barX int
+
+	if barExtension < 0 {
+		// Early - bar extends to the left
+		barWidth = int(-barExtension)
+		barX = centerX - barWidth
+	} else {
+		// Late - bar extends to the right
+		barWidth = int(barExtension)
+		barX = centerX
+	}
+
+	if barWidth > 0 {
+		timingBar := ebiten.NewImage(barWidth, barHeight)
+		timingBar.Fill(color.RGBA{255, 255, 255, 255}) // White
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Translate(float64(barX), float64(barY))
+		screen.DrawImage(timingBar, op)
+	}
 }
 
 // isWithinLineBounds checks if the boat's bow position is within the start/finish line bounds
