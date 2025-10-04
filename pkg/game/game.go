@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"math/rand"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -76,9 +77,21 @@ type GameState struct {
 }
 
 func NewGame() *GameState {
+	// 50:50 chance for which side has stronger wind
+	var leftSpeed, rightSpeed float64
+	if rand.Float32() < 0.5 {
+		// Left side stronger
+		leftSpeed = 14 // 14 kts on left side
+		rightSpeed = 8 // 8 kts on right side
+	} else {
+		// Right side stronger
+		leftSpeed = 8   // 8 kts on left side
+		rightSpeed = 14 // 14 kts on right side
+	}
+
 	wind := world.NewOscillatingWind(
-		14,         // 14 kts on left side
-		8,          // 8 kts on right side
+		leftSpeed,  // Variable wind speed on left side
+		rightSpeed, // Variable wind speed on right side
 		WorldWidth, // Use world width for interpolation
 	)
 
