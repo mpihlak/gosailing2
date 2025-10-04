@@ -284,7 +284,7 @@ func (g *GameState) Update() error {
 
 	// Update wind oscillations (only when not paused)
 	if oscillatingWind, ok := g.Wind.(*world.OscillatingWind); ok {
-		oscillatingWind.Update()
+		oscillatingWind.UpdateWithElapsedTime(g.elapsedTime.Seconds())
 	}
 
 	// Update elapsed time (only when not paused)
