@@ -455,8 +455,10 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	// Draw OCS warning below timer
 	g.drawOCSWarning(screen)
 
-	// Draw telltales (only visible when sailing upwind)
-	g.telltales.Draw(screen)
+	// Draw telltales (only visible when sailing upwind and race has started)
+	if g.raceStarted {
+		g.telltales.Draw(screen)
+	}
 
 	// Draw mobile controls (only visible on touch devices)
 	g.mobileControls.Draw(screen, g.isPaused)
