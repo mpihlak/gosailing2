@@ -76,6 +76,7 @@ type GameState struct {
 	scoreboard *Scoreboard // Leaderboard display
 	// Distance to line crossing point (during pre-start)
 	distanceToLineCrossing float64 // Distance from boat to where heading intersects starting line
+	timeToCross            float64 // Time in seconds to reach line crossing point (infinity if not crossing)
 }
 
 func NewGame() *GameState {
@@ -398,6 +399,7 @@ func (g *GameState) Update() error {
 
 	// Calculate distance to line crossing point (during pre-start)
 	g.distanceToLineCrossing = g.calculateDistanceToLineCrossing()
+	g.timeToCross = g.calculateTimeToCross()
 
 	// Update camera to follow boat when it moves out of bounds
 	g.updateCamera()
@@ -452,7 +454,7 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	screen.DrawImage(g.worldImage, op)
 
 	// Draw dashboard directly to screen (UI always visible)
-	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.timerDuration, g.elapsedTime, g.hasCrossedLine, g.secondsLate, g.speedPercentage, g.markRounded, g.raceFinished, g.distanceToLineCrossing)
+	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.timerDuration, g.elapsedTime, g.hasCrossedLine, g.secondsLate, g.speedPercentage, g.markRounded, g.raceFinished, g.distanceToLineCrossing, g.timeToCross)
 
 	// Draw race timer at top center (when race hasn't started)
 	g.drawRaceTimer(screen)
@@ -735,6 +737,32 @@ func (g *GameState) calculateDistanceToLineCrossing() float64 {
 	distance := math.Sqrt(dx*dx + dy*dy)
 
 	return distance
+}
+
+// calculateTimeToCross calculates the time in seconds for the boat to reach the line crossing point
+// Returns infinity if the boat is not crossing or has no velocity towards the line
+func (g *GameState) calculateTimeToCross() float64 {
+	// If distance to crossing is invalid, return infinity
+	if g.distanceToLineCrossing < 0 {
+		return math.Inf(1)
+	}
+
+	// Calculate current velocity magnitude from VelX and VelY (pixels per frame at 60 FPS)
+	velMagnitude := math.Sqrt(g.Boat.VelX*g.Boat.VelX + g.Boat.VelY*g.Boat.VelY)
+
+	// Convert to meters per second (velocity is in pixels/frame at 60 FPS)
+	// 1 pixel = 1 meter, 60 frames per second
+	actualSpeedMetersPerSec := velMagnitude * 60.0
+
+	// If boat has essentially no velocity, return infinity
+	if actualSpeedMetersPerSec < 0.01 {
+		return math.Inf(1)
+	}
+
+	// Time = distance / speed
+	timeToCross := g.distanceToLineCrossing / actualSpeedMetersPerSec
+
+	return timeToCross
 }
 
 // updateMarkRounding tracks the three phases of mark rounding
