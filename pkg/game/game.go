@@ -238,6 +238,12 @@ func (g *GameState) Update() error {
 				g.elapsedTime = g.timerDuration
 			}
 		}
+
+		// Handle 'L' key to show leaderboard (WASM only)
+		if inpututil.IsKeyJustPressed(ebiten.KeyL) && IsWASM() {
+			g.isPaused = true
+			g.scoreboard.ShowLeaderboardOnly(nil)
+		}
 	}
 
 	// Handle pause toggle (keyboard or mobile)
@@ -523,8 +529,10 @@ Tap anywhere to continue...`
 	} else {
 		// Desktop help text - include keyboard shortcuts
 		quitText := "Quit Game"
+		leaderboardLine := ""
 		if IsWASM() {
 			quitText = "Pause Game"
+			leaderboardLine = "  L               - View Leaderboard\n"
 		}
 
 		helpText = fmt.Sprintf(`SAILING GAME - PAUSED
@@ -544,9 +552,9 @@ Controls:
   J               - Jump Timer +10 sec (pre start)
   R               - Restart Game
   C               - Toggle Touch Controls (testing)
-  Q               - %s
+%s  Q               - %s
 
-Press SPACE to continue...`, quitText)
+Press SPACE to continue...`, leaderboardLine, quitText)
 	}
 
 	// Center the help text
