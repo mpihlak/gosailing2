@@ -925,7 +925,14 @@ func (g *GameState) showScoreboard() {
 		Timestamp:       time.Now(),
 	}
 
-	g.scoreboard.Show(result)
+	// Check if on touch device - skip name entry entirely
+	if g.mobileControls.hasTouchInput {
+		g.scoreboard.ShowLeaderboardOnly(result)
+		return
+	}
+
+	// Check if this is a top 10 finish - only offer name entry for top 10
+	g.scoreboard.ShowWithTopCheck(result)
 }
 
 // drawFinishBanner displays the RACE FINISHED banner with race time

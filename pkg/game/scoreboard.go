@@ -94,6 +94,95 @@ func (s *Scoreboard) Show(result *RaceResult) {
 	s.isLoading = false
 }
 
+// ShowLeaderboardOnly loads and displays the leaderboard without name entry
+func (s *Scoreboard) ShowLeaderboardOnly(result *RaceResult) {
+	s.isVisible = true
+	s.currentResult = result
+	s.playerName = ""
+	s.nameSubmitted = false
+	s.submitError = ""
+	s.isLoading = false
+	// Load leaderboard directly
+	s.loadLeaderboard()
+}
+
+// ShowWithTopCheck checks if the result is top 10, then shows name entry or leaderboard
+func (s *Scoreboard) ShowWithTopCheck(result *RaceResult) {
+	s.currentResult = result
+	s.playerName = ""
+	s.nameSubmitted = false
+	s.submitError = ""
+	s.isLoading = false
+
+	// Load leaderboard to check ranking
+	if IsWASM() && s.firebase != nil {
+		// Don't show scoreboard yet - wait until we know if it's top 10
+		s.isVisible = false
+		s.isLoading = true
+
+		s.firebase.GetLeaderboard(func(results []RaceResult, err string) {
+			s.isLoading = false
+			if err != "" {
+				// On error, show name entry
+				s.isVisible = true
+				s.state = StateEnterName
+				return
+			}
+
+			// Check if result is top 10
+			isTop10 := s.checkIfTop10(result, results)
+
+			// Now show the scoreboard with appropriate state
+			s.isVisible = true
+			if isTop10 {
+				// Show name entry for top 10
+				s.state = StateEnterName
+			} else {
+				// Skip name entry, just show leaderboard
+				s.createLeaderboard(results)
+				s.state = StateDisplayLeaderboard
+			}
+		})
+	} else {
+		// Standalone mode - always show name entry
+		s.isVisible = true
+		s.state = StateEnterName
+	}
+}
+
+// checkIfTop10 determines if a race result would be in the top 10
+func (s *Scoreboard) checkIfTop10(result *RaceResult, allResults []RaceResult) bool {
+	if !result.MarkRounded {
+		return false
+	}
+
+	// Filter completed races only
+	completed := make([]RaceResult, 0)
+	for _, r := range allResults {
+		if r.MarkRounded {
+			completed = append(completed, r)
+		}
+	}
+
+	// Add current result to the list
+	completed = append(completed, *result)
+
+	// Sort by race time (ascending)
+	sort.Slice(completed, func(i, j int) bool {
+		return completed[i].RaceTimeSeconds < completed[j].RaceTimeSeconds
+	})
+
+	// Find position of current result
+	for i, r := range completed {
+		if fmt.Sprintf("%.2f", r.RaceTimeSeconds) == fmt.Sprintf("%.2f", result.RaceTimeSeconds) {
+			// Top 10 means position 0-9 (rank 1-10)
+			return i < 10
+		}
+	}
+
+	return false
+}
+
 // Hide closes the scoreboard
 func (s *Scoreboard) Hide() {
 	s.isVisible = false
