@@ -74,6 +74,8 @@ type GameState struct {
 	restartBannerTime time.Time // When restart banner was triggered
 	// Scoreboard
 	scoreboard *Scoreboard // Leaderboard display
+	// Distance to line crossing point (during pre-start)
+	distanceToLineCrossing float64 // Distance from boat to where heading intersects starting line
 }
 
 func NewGame() *GameState {
@@ -394,6 +396,9 @@ func (g *GameState) Update() error {
 	// Update telltales based on current boat performance
 	g.telltales.Update(g.Boat, g.Wind, g.Dashboard)
 
+	// Calculate distance to line crossing point (during pre-start)
+	g.distanceToLineCrossing = g.calculateDistanceToLineCrossing()
+
 	// Update camera to follow boat when it moves out of bounds
 	g.updateCamera()
 
@@ -447,7 +452,7 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	screen.DrawImage(g.worldImage, op)
 
 	// Draw dashboard directly to screen (UI always visible)
-	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.timerDuration, g.elapsedTime, g.hasCrossedLine, g.secondsLate, g.speedPercentage, g.markRounded, g.raceFinished)
+	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.timerDuration, g.elapsedTime, g.hasCrossedLine, g.secondsLate, g.speedPercentage, g.markRounded, g.raceFinished, g.distanceToLineCrossing)
 
 	// Draw race timer at top center (when race hasn't started)
 	g.drawRaceTimer(screen)
@@ -674,6 +679,62 @@ func (g *GameState) isWithinLineBounds(bowPos geometry.Point) bool {
 	maxX := math.Max(lineStart.X, lineEnd.X)
 
 	return bowPos.X >= minX && bowPos.X <= maxX
+}
+
+// calculateDistanceToLineCrossing calculates the distance from the boat's bow to where its heading would intersect the starting line
+// Returns -1 if the boat is not pointing towards the line or if intersection is not between pin and committee boat
+func (g *GameState) calculateDistanceToLineCrossing() float64 {
+	// Only calculate during pre-start and when boat is below the line
+	if g.raceStarted {
+		return -1
+	}
+
+	lineStart := g.Dashboard.LineStart // Pin end
+	lineEnd := g.Dashboard.LineEnd     // Committee end
+	bowPos := g.Boat.GetBowPosition()  // Use bow position instead of center
+	lineY := lineStart.Y               // Starting line Y coordinate (horizontal line)
+
+	// Check if bow is below the line
+	if bowPos.Y <= lineY {
+		return -1
+	}
+
+	// Calculate boat's heading vector
+	headingRad := g.Boat.Heading * math.Pi / 180
+	headingDx := math.Sin(headingRad)
+	headingDy := -math.Cos(headingRad) // Y is inverted
+
+	// Check if boat is pointing towards the line (heading north-ish, dy < 0)
+	if headingDy >= 0 {
+		return -1 // Boat is pointing away from line or parallel
+	}
+
+	// Calculate intersection point with the line (where boat heading crosses Y = lineY)
+	// Line equation: bowPos + t * headingVector where (bowPos.Y + t * headingDy) = lineY
+	// Solve for t: t = (lineY - bowPos.Y) / headingDy
+	t := (lineY - bowPos.Y) / headingDy
+	if t < 0 {
+		return -1 // Intersection is behind the boat
+	}
+
+	// Calculate intersection point
+	intersectX := bowPos.X + t*headingDx
+	intersectY := lineY
+
+	// Check if intersection is between pin and committee boat
+	minX := math.Min(lineStart.X, lineEnd.X)
+	maxX := math.Max(lineStart.X, lineEnd.X)
+
+	if intersectX < minX || intersectX > maxX {
+		return -1 // Intersection is outside the starting line bounds
+	}
+
+	// Calculate distance from bow to intersection point
+	dx := intersectX - bowPos.X
+	dy := intersectY - bowPos.Y
+	distance := math.Sqrt(dx*dx + dy*dy)
+
+	return distance
 }
 
 // updateMarkRounding tracks the three phases of mark rounding

@@ -106,7 +106,7 @@ func (d *Dashboard) FindBestVMG() float64 {
 	return bestVMG
 }
 
-func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, timerDuration time.Duration, elapsedTime time.Duration, hasCrossedLine bool, secondsLate float64, speedPercentage float64, markRounded bool, raceFinished bool) {
+func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, timerDuration time.Duration, elapsedTime time.Duration, hasCrossedLine bool, secondsLate float64, speedPercentage float64, markRounded bool, raceFinished bool, distanceToLineCrossing float64) {
 	windDir, windSpeed := d.Wind.GetWind(d.Boat.Pos)
 	twa := d.Boat.Heading - windDir
 	if twa < -180 {
@@ -124,6 +124,11 @@ func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, tim
 		"Speed: %.1f kts\nHeading: %.0f°\nTWA: %.0f°\nTWD: %.0f°\nTWS: %.1f kts\nDist to Line: %.0fm\nVMG: %.1f kts\nTarget VMG: %.1f kts",
 		d.Boat.Speed, d.Boat.Heading, twa, windDir, windSpeed, distanceToLine, currentVMG, targetVMG,
 	)
+
+	// Add distance to line crossing point during pre-start
+	if !raceStarted && distanceToLineCrossing >= 0 {
+		msg += fmt.Sprintf("\nDist to Cross: %.0fm", distanceToLineCrossing)
+	}
 
 	// Add line crossing information if boat has crossed
 	if hasCrossedLine {
