@@ -3,11 +3,31 @@ package world
 import (
 	"image/color"
 	"math"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/mpihlak/gosailing2/pkg/geometry"
 )
+
+// CollisionType identifies what was hit
+type CollisionType int
+
+const (
+	CollisionMark CollisionType = iota
+	// Future: CollisionBoundary, CollisionBoat, etc.
+)
+
+// CollisionEvent represents a single collision occurrence
+type CollisionEvent struct {
+	Type      CollisionType
+	MarkName  string         // Name of mark that was hit
+	Position  geometry.Point // Where collision occurred
+	Timestamp time.Time      // When it happened
+}
+
+// Mark radius constant (meters)
+const MarkRadius = 0.5
 
 type Mark struct {
 	Pos  geometry.Point
@@ -47,6 +67,32 @@ func (m *Mark) Draw(screen *ebiten.Image) {
 
 type Arena struct {
 	Marks []*Mark
+}
+
+// CheckCollisions detects if boat has collided with any marks
+// Returns slice of collision events (empty if no collisions)
+func (a *Arena) CheckCollisions(boatPos geometry.Point, boatRadius float64) []CollisionEvent {
+	var collisions []CollisionEvent
+	now := time.Now()
+
+	for _, mark := range a.Marks {
+		// Calculate distance between boat center and mark center
+		dx := boatPos.X - mark.Pos.X
+		dy := boatPos.Y - mark.Pos.Y
+		distance := math.Sqrt(dx*dx + dy*dy)
+
+		// Check if collision occurred
+		if distance < (boatRadius + MarkRadius) {
+			collisions = append(collisions, CollisionEvent{
+				Type:      CollisionMark,
+				MarkName:  mark.Name,
+				Position:  mark.Pos,
+				Timestamp: now,
+			})
+		}
+	}
+
+	return collisions
 }
 
 // drawDottedLine draws a dotted line between two points

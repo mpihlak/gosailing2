@@ -20,6 +20,7 @@ const (
 	speedScale       = 30.0 / 6.0 // Pixels per second per knot (10 pixels/sec at 6 knots)
 	boatMass         = 4000.0     // Boat mass in kg
 	dragCoefficient  = 0.02       // Water resistance coefficient (reduced for more gradual deceleration)
+	BoatRadius       = 5.0        // Collision radius in meters
 )
 
 type Boat struct {

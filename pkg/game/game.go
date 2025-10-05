@@ -77,6 +77,13 @@ type GameState struct {
 	// Distance to line crossing point (during pre-start)
 	distanceToLineCrossing float64 // Distance from boat to where heading intersects starting line
 	timeToCross            float64 // Time in seconds to reach line crossing point (infinity if not crossing)
+	// Collision tracking
+	penaltyCount      int                    // Total collision penalties
+	collisionHistory  []world.CollisionEvent // All collisions for review/display
+	lastCollisionTime time.Time              // Debounce repeated collisions
+	// Collision visual feedback
+	showCollisionFlash bool      // Whether to show collision flash
+	collisionFlashTime time.Time // When collision flash was triggered
 }
 
 func NewGame() *GameState {
@@ -400,6 +407,28 @@ func (g *GameState) Update() error {
 
 	g.Boat.Update()
 
+	// Check for collisions (during pre-start and active race, but not when finished)
+	if !g.raceFinished {
+		collisions := g.Arena.CheckCollisions(g.Boat.Pos, objects.BoatRadius)
+
+		// Process collisions with debouncing (avoid counting same collision multiple times)
+		for _, collision := range collisions {
+			// Only count if enough time has passed since last collision (0.5 second debounce)
+			if time.Since(g.lastCollisionTime) > 500*time.Millisecond {
+				g.penaltyCount++
+				g.collisionHistory = append(g.collisionHistory, collision)
+				g.lastCollisionTime = time.Now()
+				g.showCollisionFlash = true
+				g.collisionFlashTime = time.Now()
+			}
+		}
+	}
+
+	// Hide collision flash after 250ms
+	if g.showCollisionFlash && time.Since(g.collisionFlashTime) > 250*time.Millisecond {
+		g.showCollisionFlash = false
+	}
+
 	// Update telltales based on current boat performance
 	g.telltales.Update(g.Boat, g.Wind, g.Dashboard)
 
@@ -460,7 +489,7 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	screen.DrawImage(g.worldImage, op)
 
 	// Draw dashboard directly to screen (UI always visible)
-	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.timerDuration, g.elapsedTime, g.hasCrossedLine, g.secondsLate, g.speedPercentage, g.markRounded, g.raceFinished, g.distanceToLineCrossing, g.timeToCross)
+	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.timerDuration, g.elapsedTime, g.hasCrossedLine, g.secondsLate, g.speedPercentage, g.markRounded, g.raceFinished, g.distanceToLineCrossing, g.timeToCross, g.penaltyCount)
 
 	// Draw race timer at top center (when race hasn't started)
 	g.drawRaceTimer(screen)
@@ -492,6 +521,11 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	// Show FINISH banner when race is finished
 	if g.showFinishBanner {
 		g.drawFinishBanner(screen)
+	}
+
+	// Show collision flash
+	if g.showCollisionFlash {
+		g.drawCollisionFlash(screen)
 	}
 
 	// Draw help screen when paused
@@ -963,6 +997,12 @@ func (g *GameState) drawFinishBanner(screen *ebiten.Image) {
 	y := bounds.Dy()/2 - 30
 
 	ebitenutil.DebugPrintAt(screen, finishText, x, y)
+}
+
+// drawCollisionFlash displays a red flash overlay when collision occurs
+func (g *GameState) drawCollisionFlash(screen *ebiten.Image) {
+	// Red flash overlay (semi-transparent)
+	vector.DrawFilledRect(screen, 0, 0, ScreenWidth, ScreenHeight, color.RGBA{255, 0, 0, 50}, false)
 }
 
 func (g *GameState) Layout(outsideWidth, outsideHeight int) (int, int) {
