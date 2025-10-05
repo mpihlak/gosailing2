@@ -50,6 +50,8 @@ func (fc *FirebaseClient) SubmitScore(result *RaceResult, callback func(bool, st
 		"seconds_late":      result.SecondsLate,
 		"speed_percentage":  result.SpeedPercentage,
 		"mark_rounded":      result.MarkRounded,
+		"distance_sailed":   result.DistanceSailed,
+		"average_speed":     result.AverageSpeed,
 		"timestamp":         result.Timestamp.Unix(),
 	}
 
@@ -131,6 +133,8 @@ func (fc *FirebaseClient) GetLeaderboard(callback func([]RaceResult, string)) {
 				SecondsLate:     getFloatValue(data, "seconds_late"),
 				SpeedPercentage: getFloatValue(data, "speed_percentage"),
 				MarkRounded:     getBoolValue(data, "mark_rounded"),
+				DistanceSailed:  getFloatValue(data, "distance_sailed"),
+				AverageSpeed:    getFloatValue(data, "average_speed"),
 				Timestamp:       time.Unix(int64(getFloatValue(data, "timestamp")), 0),
 			}
 

@@ -54,7 +54,7 @@ type GameState struct {
 	isOCS bool // Whether boat is On Course Side
 	// Line crossing tracking
 	hasCrossedLine   bool           // Whether boat has crossed the starting line after race start
-	lineCrossingTime time.Duration  // When boat crossed the line (elapsed time)
+	lineCrossingTime time.Duration  // When boat crossed the line (race timer, not elapsed time)
 	secondsLate      float64        // How many seconds late the boat was
 	vmgAtCrossing    float64        // VMG when crossing the line
 	speedPercentage  float64        // Speed as percentage of target beat speed
@@ -84,6 +84,12 @@ type GameState struct {
 	// Collision visual feedback
 	showCollisionFlash bool      // Whether to show collision flash
 	collisionFlashTime time.Time // When collision flash was triggered
+	// Distance tracking
+	distanceSailed     float64        // Total distance sailed since crossing start line (meters)
+	prevBoatPos        geometry.Point // Previous boat position for distance calculation
+	averageSpeed       float64        // Average speed over the race (knots)
+	speedSum           float64        // Sum of boat speeds for calculating average
+	speedSamples       int            // Number of speed samples taken
 }
 
 func NewGame() *GameState {
@@ -348,7 +354,7 @@ func (g *GameState) Update() error {
 			// AND the boat is within line bounds at the moment of crossing
 			if g.prevBowPos.Y > startLineY && bowPos.Y <= startLineY && g.isWithinLineBounds(bowPos) {
 				g.hasCrossedLine = true
-				g.lineCrossingTime = g.elapsedTime
+				g.lineCrossingTime = g.raceTimer // Capture race timer at line crossing
 				// Calculate how late the boat was (time after race start)
 				g.secondsLate = (g.elapsedTime - g.timerDuration).Seconds()
 				// Calculate VMG at crossing
@@ -362,7 +368,25 @@ func (g *GameState) Update() error {
 				} else {
 					g.speedPercentage = 0
 				}
+				// Initialize distance tracking
+				g.prevBoatPos = g.Boat.Pos
+				g.distanceSailed = 0
+				// Initialize speed averaging
+				g.speedSum = 0
+				g.speedSamples = 0
 			}
+		}
+
+		// Track distance and speed after crossing start line
+		if g.hasCrossedLine && !g.raceFinished {
+			dx := g.Boat.Pos.X - g.prevBoatPos.X
+			dy := g.Boat.Pos.Y - g.prevBoatPos.Y
+			distanceThisFrame := math.Sqrt(dx*dx + dy*dy)
+			g.distanceSailed += distanceThisFrame
+			g.prevBoatPos = g.Boat.Pos
+			// Track speed for averaging
+			g.speedSum += g.Boat.Speed
+			g.speedSamples++
 		}
 
 		// Mark rounding detection (only if race has started and boat has crossed starting line)
@@ -489,7 +513,7 @@ func (g *GameState) Draw(screen *ebiten.Image) {
 	screen.DrawImage(g.worldImage, op)
 
 	// Draw dashboard directly to screen (UI always visible)
-	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.timerDuration, g.elapsedTime, g.hasCrossedLine, g.secondsLate, g.speedPercentage, g.markRounded, g.raceFinished, g.distanceToLineCrossing, g.timeToCross, g.penaltyCount)
+	g.Dashboard.Draw(screen, g.raceStarted, g.isOCS, g.timerDuration, g.elapsedTime, g.hasCrossedLine, g.secondsLate, g.speedPercentage, g.markRounded, g.raceFinished, g.distanceToLineCrossing, g.timeToCross, g.penaltyCount, g.distanceSailed)
 
 	// Draw race timer at top center (when race hasn't started)
 	g.drawRaceTimer(screen)
@@ -940,6 +964,11 @@ func (g *GameState) checkFinishLineCrossing() {
 		g.showFinishBanner = true
 		g.finishBannerTime = time.Now()
 
+		// Calculate average speed from running average of boat speed
+		if g.speedSamples > 0 {
+			g.averageSpeed = g.speedSum / float64(g.speedSamples)
+		}
+
 		// Show scoreboard after a short delay (let finish banner show first)
 		go func() {
 			time.Sleep(3 * time.Second)
@@ -964,6 +993,8 @@ func (g *GameState) showScoreboard() {
 		SecondsLate:     g.secondsLate,
 		SpeedPercentage: g.speedPercentage,
 		MarkRounded:     g.markRounded,
+		DistanceSailed:  g.distanceSailed,
+		AverageSpeed:    g.averageSpeed,
 		Timestamp:       time.Now(),
 	}
 
@@ -989,12 +1020,13 @@ func (g *GameState) drawFinishBanner(screen *ebiten.Image) {
 	seconds := int(g.finishTime.Seconds()) % 60
 	centiseconds := int((g.finishTime.Milliseconds() % 1000) / 10)
 
-	// FINISH banner text with race time
-	finishText := fmt.Sprintf("*** RACE FINISHED! ***\nTime: %02d:%02d.%02d", minutes, seconds, centiseconds)
+	// FINISH banner text with race time, distance, and average speed
+	finishText := fmt.Sprintf("*** RACE FINISHED! ***\nTime: %02d:%02d.%02d\nDistance: %.0fm\nAvg Speed: %.1f kts",
+		minutes, seconds, centiseconds, g.distanceSailed, g.averageSpeed)
 
 	// Center the text
 	x := bounds.Dx()/2 - 100 // Approximate centering (wider than other banners)
-	y := bounds.Dy()/2 - 30
+	y := bounds.Dy()/2 - 50  // Adjusted for more lines
 
 	ebitenutil.DebugPrintAt(screen, finishText, x, y)
 }

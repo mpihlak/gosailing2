@@ -20,6 +20,8 @@ type RaceResult struct {
 	SecondsLate     float64   `json:"seconds_late"`
 	SpeedPercentage float64   `json:"speed_percentage"`
 	MarkRounded     bool      `json:"mark_rounded"`
+	DistanceSailed  float64   `json:"distance_sailed"`  // Total distance in meters
+	AverageSpeed    float64   `json:"average_speed"`    // Average speed in knots
 	Timestamp       time.Time `json:"timestamp"`
 }
 
@@ -29,7 +31,9 @@ type LeaderboardEntry struct {
 	PlayerName    string
 	RaceTime      string
 	SecondsLate   string
-	IsCurrentRace bool // Highlight the most recent race result
+	Distance      string // Distance sailed (formatted)
+	AvgSpeed      string // Average speed (formatted)
+	IsCurrentRace bool   // Highlight the most recent race result
 }
 
 // Scoreboard manages the leaderboard display and player name input
@@ -372,11 +376,23 @@ func (s *Scoreboard) createLeaderboard(results []RaceResult) {
 			result.PlayerName == currentRaceResult.PlayerName &&
 			fmt.Sprintf("%.2f", result.RaceTimeSeconds) == fmt.Sprintf("%.2f", currentRaceResult.RaceTimeSeconds)
 
+		// Format distance and average speed (handle old records without distance)
+		distanceStr := "-"
+		avgSpeedStr := "-"
+		if result.DistanceSailed > 0 {
+			distanceStr = fmt.Sprintf("%.0fm", result.DistanceSailed)
+		}
+		if result.AverageSpeed > 0 {
+			avgSpeedStr = fmt.Sprintf("%.1fkt", result.AverageSpeed)
+		}
+
 		entry := LeaderboardEntry{
 			Rank:          i + 1,
 			PlayerName:    result.PlayerName,
 			RaceTime:      raceTimeStr,
 			SecondsLate:   lateStr,
+			Distance:      distanceStr,
+			AvgSpeed:      avgSpeedStr,
 			IsCurrentRace: isCurrentRace,
 		}
 
@@ -396,11 +412,23 @@ func (s *Scoreboard) createLeaderboard(results []RaceResult) {
 			lateStr = "Early"
 		}
 
+		// Format distance and average speed
+		distanceStr := "-"
+		avgSpeedStr := "-"
+		if currentRaceResult.DistanceSailed > 0 {
+			distanceStr = fmt.Sprintf("%.0fm", currentRaceResult.DistanceSailed)
+		}
+		if currentRaceResult.AverageSpeed > 0 {
+			avgSpeedStr = fmt.Sprintf("%.1fkt", currentRaceResult.AverageSpeed)
+		}
+
 		s.currentRaceEntry = &LeaderboardEntry{
 			Rank:          currentRaceRank,
 			PlayerName:    currentRaceResult.PlayerName,
 			RaceTime:      raceTimeStr,
 			SecondsLate:   lateStr,
+			Distance:      distanceStr,
+			AvgSpeed:      avgSpeedStr,
 			IsCurrentRace: true,
 		}
 	}
@@ -421,12 +449,24 @@ func (s *Scoreboard) createLocalLeaderboard() {
 		lateStr = "Early"
 	}
 
+	// Format distance and average speed
+	distanceStr := "-"
+	avgSpeedStr := "-"
+	if s.currentResult.DistanceSailed > 0 {
+		distanceStr = fmt.Sprintf("%.0fm", s.currentResult.DistanceSailed)
+	}
+	if s.currentResult.AverageSpeed > 0 {
+		avgSpeedStr = fmt.Sprintf("%.1fkt", s.currentResult.AverageSpeed)
+	}
+
 	s.leaderboard = []LeaderboardEntry{
 		{
 			Rank:          1,
 			PlayerName:    s.currentResult.PlayerName,
 			RaceTime:      raceTimeStr,
 			SecondsLate:   lateStr,
+			Distance:      distanceStr,
+			AvgSpeed:      avgSpeedStr,
 			IsCurrentRace: true,
 		},
 	}
@@ -527,10 +567,12 @@ func (s *Scoreboard) drawLeaderboard(screen *ebiten.Image) {
 	ebitenutil.DebugPrintAt(screen, "Name", centerX-120, headerY)
 	ebitenutil.DebugPrintAt(screen, "Time", centerX-20, headerY)
 	ebitenutil.DebugPrintAt(screen, "Late", centerX+60, headerY)
+	ebitenutil.DebugPrintAt(screen, "Dist", centerX+120, headerY)
+	ebitenutil.DebugPrintAt(screen, "Avg", centerX+170, headerY)
 
 	// Draw line under headers
 	lineY := float32(headerY + 15)
-	vector.StrokeLine(screen, float32(centerX-190), lineY, float32(centerX+120), lineY, 1, color.RGBA{255, 255, 255, 255}, false)
+	vector.StrokeLine(screen, float32(centerX-190), lineY, float32(centerX+220), lineY, 1, color.RGBA{255, 255, 255, 255}, false)
 
 	// Leaderboard entries
 	for i, entry := range s.leaderboard {
@@ -539,7 +581,7 @@ func (s *Scoreboard) drawLeaderboard(screen *ebiten.Image) {
 		// Highlight current race
 		if entry.IsCurrentRace {
 			highlightY := float32(entryY - 2)
-			vector.DrawFilledRect(screen, float32(centerX-195), highlightY, 320, 20, color.RGBA{173, 216, 230, 150}, false)
+			vector.DrawFilledRect(screen, float32(centerX-195), highlightY, 420, 20, color.RGBA{173, 216, 230, 150}, false)
 		}
 
 		// Draw entry data
@@ -553,6 +595,8 @@ func (s *Scoreboard) drawLeaderboard(screen *ebiten.Image) {
 		ebitenutil.DebugPrintAt(screen, displayName, centerX-120, entryY)
 		ebitenutil.DebugPrintAt(screen, entry.RaceTime, centerX-20, entryY)
 		ebitenutil.DebugPrintAt(screen, entry.SecondsLate, centerX+60, entryY)
+		ebitenutil.DebugPrintAt(screen, entry.Distance, centerX+120, entryY)
+		ebitenutil.DebugPrintAt(screen, entry.AvgSpeed, centerX+170, entryY)
 	}
 
 	// Draw separator and current race entry if it's outside top 10
@@ -567,7 +611,7 @@ func (s *Scoreboard) drawLeaderboard(screen *ebiten.Image) {
 
 		// Highlight current race with light blue background
 		highlightY := float32(entryY - 2)
-		vector.DrawFilledRect(screen, float32(centerX-195), highlightY, 320, 20, color.RGBA{173, 216, 230, 150}, false)
+		vector.DrawFilledRect(screen, float32(centerX-195), highlightY, 420, 20, color.RGBA{173, 216, 230, 150}, false)
 
 		// Draw entry data
 		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("%d", s.currentRaceEntry.Rank), centerX-180, entryY)
@@ -580,6 +624,8 @@ func (s *Scoreboard) drawLeaderboard(screen *ebiten.Image) {
 		ebitenutil.DebugPrintAt(screen, displayName, centerX-120, entryY)
 		ebitenutil.DebugPrintAt(screen, s.currentRaceEntry.RaceTime, centerX-20, entryY)
 		ebitenutil.DebugPrintAt(screen, s.currentRaceEntry.SecondsLate, centerX+60, entryY)
+		ebitenutil.DebugPrintAt(screen, s.currentRaceEntry.Distance, centerX+120, entryY)
+		ebitenutil.DebugPrintAt(screen, s.currentRaceEntry.AvgSpeed, centerX+170, entryY)
 	} // Instructions
 	var instructions string
 	if IsWASM() {
