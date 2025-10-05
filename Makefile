@@ -1,17 +1,19 @@
 # Go Sailing Game Makefile
 
-.PHONY: build run web clean help
+.PHONY: build run web clean help test test-coverage
 
 # Default target
 help:
 	@echo "Go Sailing Game Build Commands:"
-	@echo "  make build       - Build native desktop version"
-	@echo "  make run         - Build and run desktop version"
-	@echo "  make web         - Build and serve web version (WASM)"
-	@echo "  make wasm        - Build WASM only (may overwrite index.html)"
-	@echo "  make wasm-static - Build WASM preserving existing index.html"
-	@echo "  make clean       - Clean build artifacts"
-	@echo "  make help        - Show this help"
+	@echo "  make build         - Build native desktop version"
+	@echo "  make run           - Build and run desktop version"
+	@echo "  make test          - Run all tests"
+	@echo "  make test-coverage - Run tests with coverage report"
+	@echo "  make web           - Build and serve web version (WASM)"
+	@echo "  make wasm          - Build WASM only (may overwrite index.html)"
+	@echo "  make wasm-static   - Build WASM preserving existing index.html"
+	@echo "  make clean         - Clean build artifacts"
+	@echo "  make help          - Show this help"
 
 # Build desktop version
 build:
@@ -57,3 +59,15 @@ wasm-static:
 		echo "✅ Using existing index.html (Firebase config preserved)"; \
 	fi
 	@echo "WASM build complete in web/ directory"
+
+# Run tests
+test:
+	@echo "🧪 Running tests..."
+	go test -v ./pkg/...
+
+# Run tests with coverage
+test-coverage:
+	@echo "🧪 Running tests with coverage..."
+	go test -coverprofile=coverage.out ./pkg/...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
