@@ -135,7 +135,6 @@ func (a *Arena) FindMark(name string) *Mark {
 	}
 	return nil
 }
-}
 
 // drawDottedLine draws a dotted line between two points
 func (a *Arena) drawDottedLine(screen *ebiten.Image, x1, y1, x2, y2 float64, lineColor color.Color) {
