@@ -1081,7 +1081,8 @@ func (g *GameState) updateMarkRounding() {
 
 	switch g.CourseLeg {
 	case 0:
-		// First upwind rounding (leave to port)
+		// First upwind rounding for KJK course - only needs to pass north and get to port side
+		// (not a full rounding since next leg is reaching to spreader, not downwind)
 		if !g.markRoundingPhase1 {
 			if boatPos.Y <= upwind.Pos.Y-1 {
 				g.markRoundingPhase1 = true
@@ -1091,15 +1092,10 @@ func (g *GameState) updateMarkRounding() {
 			if boatPos.Y < upwind.Pos.Y {
 				if boatPos.X <= upwind.Pos.X-1 {
 					g.markRoundingPhase2 = true
+					g.markRounded = true // Mark rounded when reaching port side (no need for phase 3)
 				}
 			} else {
 				g.markRoundingPhase2 = false
-			}
-		}
-		if g.markRoundingPhase1 && g.markRoundingPhase2 && !g.markRoundingPhase3 {
-			if boatPos.Y >= upwind.Pos.Y+1 {
-				g.markRoundingPhase3 = true
-				g.markRounded = true
 			}
 		}
 		if g.markRounded {
