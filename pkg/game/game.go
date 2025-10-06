@@ -146,13 +146,22 @@ func NewGameWithCourse(course CourseType) *GameState {
 	)
 
 	// Position starting line in center of world, optimized for 720p view
-	// Starting line length = 0.2 nm (~370.4 m), centered horizontally
-	startLength := 0.2 * 1852.0 // 0.2 nautical miles in meters (1 nm = 1852 m)
-	halfStart := startLength / 2.0
-	centerX := float64(WorldWidth) / 2.0
-	pinX := centerX - halfStart
-	// Committee boat in the middle visually
-	committeeX := centerX
+	var pinX, committeeX float64
+	var startLength float64
+	
+	if course == CourseWindwardFinish {
+		// Original starting line: 400m total (200m each side from center)
+		pinX = float64(WorldWidth/2 - 200)       // Pin end (left)
+		committeeX = float64(WorldWidth/2 + 200) // Committee end (right)
+		startLength = 400.0 // 400m line
+	} else {
+		// KJK course: 0.2 nm (~370.4 m) with committee boat in middle
+		startLength = 0.2 * 1852.0 // 0.2 nautical miles in meters (1 nm = 1852 m)
+		halfStart := startLength / 2.0
+		centerX := float64(WorldWidth) / 2.0
+		pinX = centerX - halfStart
+		committeeX = centerX // Committee boat in the middle for KJK course
+	}
 	lineY := float64(2400) // Positioned to accommodate upwind mark
 
 	// Boat starts 180 meters below middle of line, sailing parallel to line towards committee boat
@@ -209,21 +218,29 @@ func NewGameWithCourse(course CourseType) *GameState {
 		marks = append(marks, &world.Mark{Pos: geometry.Point{X: upwindMarkX + gateOffset, Y: gateY}, Name: "GateRight"})
 	}
 
-	// Add finish line: left endpoint is the Committee mark, length = 1/3 of start
-	finishLength := startLength / 3.0
-	finishStartX := committeeX
-	finishEndX := finishStartX + finishLength
-	marks = append(marks, &world.Mark{Pos: geometry.Point{X: finishEndX, Y: lineY}, Name: "FinishEnd"})
+	// Configure finish line based on course type
+	var finishStartX, finishEndX float64
+	if course == CourseKJKInshore {
+		// KJK course: separate finish line (1/3 of start line length)
+		finishLength := startLength / 3.0
+		finishStartX = committeeX
+		finishEndX = finishStartX + finishLength
+		marks = append(marks, &world.Mark{Pos: geometry.Point{X: finishEndX, Y: lineY}, Name: "FinishEnd"})
+	} else {
+		// Windward-finish course: finish line is same as starting line
+		finishStartX = pinX
+		finishEndX = committeeX
+	}
 
 	arena := &world.Arena{Marks: marks}
 	dash := &dashboard.Dashboard{
 		Boat:       boat,
 		Wind:       wind,
 		StartTime:  time.Now().Add(5 * time.Minute),
-	LineStart:      geometry.Point{X: pinX, Y: lineY},          // Pin end
-	LineEnd:        geometry.Point{X: committeeX, Y: lineY},    // Committee end as rightmost start mark
-	FinishLineStart: geometry.Point{X: committeeX, Y: lineY},   // Finish left (Committee)
-	FinishLineEnd:   geometry.Point{X: finishEndX, Y: lineY},   // Finish right (blue flag)
+	LineStart:      geometry.Point{X: pinX, Y: lineY},            // Pin end
+	LineEnd:        geometry.Point{X: committeeX, Y: lineY},      // Committee end
+	FinishLineStart: geometry.Point{X: finishStartX, Y: lineY},   // Finish start
+	FinishLineEnd:   geometry.Point{X: finishEndX, Y: lineY},     // Finish end
 		UpwindMark: geometry.Point{X: upwindMarkX, Y: upwindMarkY}, // Upwind mark
 	}
 
@@ -1161,42 +1178,74 @@ func (g *GameState) updateMarkRounding() {
 
 // checkFinishLineCrossing detects when boat crosses finish line from course side
 func (g *GameState) checkFinishLineCrossing() {
-	// Use the dashboard's finish line endpoints
 	bowPos := g.Boat.GetBowPosition()
-	finishStart := g.Dashboard.FinishLineStart
-	finishEnd := g.Dashboard.FinishLineEnd
 
-	// Only allow finish for KJK InShore when on leg 4
-	if g.CourseType == CourseKJKInshore && g.CourseLeg != 4 {
-		return
-	}
-
-	// Check if bow crosses the finish line Y coordinate from above to below and is within finish bounds
-	if g.prevBowPos.Y < finishStart.Y && bowPos.Y >= finishStart.Y {
-		// Check X between finishStart and finishEnd
-		minX := math.Min(finishStart.X, finishEnd.X)
-		maxX := math.Max(finishStart.X, finishEnd.X)
-		if bowPos.X >= minX && bowPos.X <= maxX {
-            // Boat has finished the race!
-            g.raceFinished = true
-            g.finishTime = g.raceTimer
-            g.showFinishBanner = true
-            g.finishBannerTime = time.Now()
-            // Mark course as completed when finish conditions met
-            g.courseCompleted = true
+	if g.CourseType == CourseWindwardFinish {
+		// For windward-finish course, finish line is same as starting line
+		startLineY := 2400.0
+		
+		// Check if bow crosses the Y coordinate from above (prevBowPos.Y < startLineY) to below (bowPos.Y >= startLineY)
+		// AND the boat is within line bounds at the moment of crossing
+		// Boat must be coming from course side (north) and cross to finish side (south) while between pin and committee boat
+		if g.prevBowPos.Y < startLineY && bowPos.Y >= startLineY && g.isWithinLineBounds(bowPos) {
+			// Boat has finished the race!
+			g.raceFinished = true
+			g.finishTime = g.raceTimer
+			g.showFinishBanner = true
+			g.finishBannerTime = time.Now()
+			// Mark course as completed when finish conditions met
+			g.courseCompleted = true
 
 			// Calculate average speed from running average of boat speed
 			if g.speedSamples > 0 {
 				g.averageSpeed = g.speedSum / float64(g.speedSamples)
 			}
 
-            // Show scoreboard after a short delay (let finish banner show first)
-            go func() {
-                time.Sleep(3 * time.Second)
-                if g.raceFinished && !g.scoreboard.IsVisible() {
-                    g.showScoreboard()
-                }
-            }()
+			// Show scoreboard after a short delay (let finish banner show first)
+			go func() {
+				time.Sleep(3 * time.Second)
+				if g.raceFinished && !g.scoreboard.IsVisible() {
+					g.showScoreboard()
+				}
+			}()
+		}
+	} else if g.CourseType == CourseKJKInshore {
+		// Only allow finish for KJK InShore when on leg 4
+		if g.CourseLeg != 4 {
+			return
+		}
+
+		// Use the dashboard's finish line endpoints for KJK course
+		finishStart := g.Dashboard.FinishLineStart
+		finishEnd := g.Dashboard.FinishLineEnd
+
+		// Check if bow crosses the finish line Y coordinate from above to below and is within finish bounds
+		if g.prevBowPos.Y < finishStart.Y && bowPos.Y >= finishStart.Y {
+			// Check X between finishStart and finishEnd
+			minX := math.Min(finishStart.X, finishEnd.X)
+			maxX := math.Max(finishStart.X, finishEnd.X)
+			if bowPos.X >= minX && bowPos.X <= maxX {
+				// Boat has finished the race!
+				g.raceFinished = true
+				g.finishTime = g.raceTimer
+				g.showFinishBanner = true
+				g.finishBannerTime = time.Now()
+				// Mark course as completed when finish conditions met
+				g.courseCompleted = true
+
+				// Calculate average speed from running average of boat speed
+				if g.speedSamples > 0 {
+					g.averageSpeed = g.speedSum / float64(g.speedSamples)
+				}
+
+				// Show scoreboard after a short delay (let finish banner show first)
+				go func() {
+					time.Sleep(3 * time.Second)
+					if g.raceFinished && !g.scoreboard.IsVisible() {
+						g.showScoreboard()
+					}
+				}()
+			}
 		}
 	}
 }
