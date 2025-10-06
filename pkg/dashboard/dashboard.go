@@ -183,6 +183,6 @@ func (d *Dashboard) Draw(screen *ebiten.Image, raceStarted bool, isOCS bool, tim
 		// (Gate debug info removed)
 	}
 
-	// Left-align HUD text so it fits on screen
-	ebitenutil.DebugPrintAt(screen, msg, 10, 10)
+	// Right-align HUD text on the right side of screen (moved left to fit longer text)
+	ebitenutil.DebugPrintAt(screen, msg, screen.Bounds().Dx()-230, 10)
 }
